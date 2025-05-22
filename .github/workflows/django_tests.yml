@@ -18,6 +18,7 @@ jobs:
       # DATABASE_URL: ${{ secrets.DATABASE_URL_TEST }} # No es necesario si se usa SQLite para tests como en settings.py
       SECRET_KEY: ${{ secrets.SECRET_KEY_TEST }}
       DEBUG: "False" # Para tests, DEBUG debería ser False
+      USE_SQLITE_FOR_TESTS: "True" # Asegura que SQLite se use para tests
       # Si necesitas ALLOWED_HOSTS para tus tests, puedes configurarlo aquí o en tus settings de test
       # ALLOWED_HOSTS: "localhost,127.0.0.1"
 
@@ -36,4 +37,4 @@ jobs:
 
     - name: Run Tests
       run: |
-        python manage.py test 
+        pytest 
