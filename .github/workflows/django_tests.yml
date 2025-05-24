@@ -2,9 +2,9 @@ name: Django CI
 
 on:
   push:
-    branches: [ "main" ] # Cambia "main" por tu rama principal si es diferente (ej. master)
+    branches: [ "main", "develop" ] # Cambia "main" por tu rama principal si es diferente (ej. master)
   pull_request:
-    branches: [ "main" ] # Cambia "main" por tu rama principal si es diferente
+    branches: [ "main", "develop" ] # Cambia "main" por tu rama principal si es diferente
 
 permissions:
   contents: read
