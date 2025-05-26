@@ -45,7 +45,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'inventory'
+    'rest_framework',
+    'rest_framework.authtoken',
+    'drf_yasg',
+    'djoser',
 ]
 
 MIDDLEWARE = [
@@ -139,3 +142,29 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        # Si usamos JWT, aquí iría: 'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
+
+# Djoser settings (opcional, para personalización)
+DJOSER = {
+    # 'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
+    # 'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
+    # 'ACTIVATION_URL': 'activate/{uid}/{token}',
+    # 'SEND_ACTIVATION_EMAIL': False, # Cambiar a True si quieres activación por email
+    # 'SERIALIZERS': {
+    #     'user_create': 'your_app.serializers.UserCreateSerializer', # Ejemplo para personalizar
+    #     'user': 'your_app.serializers.UserSerializer',
+    #     'current_user': 'your_app.serializers.UserSerializer',
+    # },
+    # 'USER_ID_FIELD': 'id', # o el campo que uses como ID de usuario
+    # 'LOGIN_FIELD': 'email', # o 'username'
+}
