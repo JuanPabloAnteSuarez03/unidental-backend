@@ -8,6 +8,7 @@ cryptography==45.0.2
 defusedxml==0.7.1
 dj-database-url==2.3.0
 Django==5.2
+django-filter==25.1
 django-templated-mail==1.1.1
 djangorestframework==3.16.0
 djangorestframework_simplejwt==5.5.0
@@ -42,4 +43,4 @@ typing_extensions==4.13.2
 tzdata==2025.2
 uritemplate==4.1.1
 urllib3==2.4.0
-whitenoise==6.7.0
+whitenoise==6.9.0
