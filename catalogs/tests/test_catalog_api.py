@@ -115,71 +115,79 @@ class TestCategoryAPI:
 class TestProductAPI:
     def setup_method(self):
         self.products_url = reverse('product-list')
-        self.category1 = Category.objects.create(name='Anestésicos', description='Para control del dolor')
-        self.product_data = {
-            'sku': 'ANEST-LIDO-001',
-            'name': 'Lidocaína 2% con Epinefrina',
-            'description': 'Cartucho de anestésico local.',
+        self.category1 = Category.objects.create(name='Anestésicos Test', description='Para control del dolor en tests')
+        # Limpiar productos que podrían usar el mismo SKU para evitar IntegrityError en creación directa
+        Product.objects.filter(sku='ANEST-LIDO-001-TEST').delete()
+        
+        self.product_data_dict_for_api = { # Para usar con la API, se envía el ID de categoría
+            'sku': 'ANEST-LIDO-001-TEST',
+            'name': 'Lidocaína 2% con Epinefrina Test',
+            'description': 'Cartucho de anestésico local para test.',
             'unit': 'cartucho',
-            'category': self.category1.pk
+            'category': self.category1.pk 
+        }
+        self.product_data_for_model_creation = { # Para crear directamente con el ORM, se pasa la instancia
+            'sku': 'ANEST-LIDO-001-TEST',
+            'name': 'Lidocaína 2% con Epinefrina Test',
+            'description': 'Cartucho de anestésico local para test.',
+            'unit': 'cartucho',
+            'category': self.category1 # <--- CORRECCIÓN: Usar la instancia de Category
         }
 
     def test_create_product_authenticated(self, api_client_authenticated):
         """Prueba la creación de un producto por un usuario autenticado."""
-        response = api_client_authenticated.post(self.products_url, self.product_data, format='json')
+        # Usar el diccionario preparado para la API
+        response = api_client_authenticated.post(self.products_url, self.product_data_dict_for_api, format='json')
         assert response.status_code == 201, f"Error: {response.data}"
-        assert Product.objects.filter(sku=self.product_data['sku']).exists()
-        created_product = Product.objects.get(sku=self.product_data['sku'])
-        assert created_product.name == self.product_data['name']
-        assert created_product.category.pk == self.product_data['category']
+        assert Product.objects.filter(sku=self.product_data_dict_for_api['sku']).exists()
+        created_product = Product.objects.get(sku=self.product_data_dict_for_api['sku'])
+        assert created_product.name == self.product_data_dict_for_api['name']
+        assert created_product.category.pk == self.product_data_dict_for_api['category']
 
     def test_create_product_unauthenticated(self):
         """Prueba que un usuario no autenticado no puede crear un producto."""
         client = APIClient()
-        response = client.post(self.products_url, self.product_data, format='json')
+        response = client.post(self.products_url, self.product_data_dict_for_api, format='json')
         assert response.status_code == 401 # Unauthorized
 
     def test_create_product_duplicate_sku(self, api_client_authenticated):
         """Prueba la creación de un producto con SKU duplicado."""
-        Product.objects.create(
-            sku='SKUDUP001', name='Producto Existente', unit='unidad', category=self.category1
-        )
-        payload = {
-            'sku': 'SKUDUP001', 
-            'name': 'Producto Nuevo Mismo SKU', 
-            'unit': 'caja', 
-            'category': self.category1.pk
-        }
-        response = api_client_authenticated.post(self.products_url, payload, format='json')
+        # Crear el primer producto usando los datos para la creación directa del modelo
+        Product.objects.create(**self.product_data_for_model_creation) 
+        # Intentar crear a través de la API con el mismo SKU
+        payload_dup_sku = {**self.product_data_dict_for_api, 'name': 'Otro Nombre Mismo SKU'}
+        response = api_client_authenticated.post(self.products_url, payload_dup_sku, format='json')
         assert response.status_code == 400, f"Error: {response.data}"
 
     def test_create_product_nonexistent_category(self, api_client_authenticated):
         """Prueba crear un producto con un ID de categoría que no existe."""
         non_existent_category_id = 9999
-        payload = {**self.product_data, 'category': non_existent_category_id, 'sku': 'NEWPRODSKU002'}
+        # Crear un SKU único para este test para evitar colisiones con otros tests que puedan crear el mismo SKU base
+        unique_sku_for_this_test = f"{self.product_data_dict_for_api['sku']}-noncat"
+        payload = {**self.product_data_dict_for_api, 'category': non_existent_category_id, 'sku': unique_sku_for_this_test}
         response = api_client_authenticated.post(self.products_url, payload, format='json')
         assert response.status_code == 400, f"Error: {response.data}"
-        # DRF devuelve 400 si una FK no es válida.
 
     def test_list_products(self, api_client_authenticated):
         """Prueba obtener la lista de productos."""
-        Product.objects.create(sku='P001', name='Producto A', unit='un', category=self.category1)
-        Product.objects.create(sku='P002', name='Producto B', unit='kg', category=self.category1)
+        Product.objects.create(sku='P001-TEST', name='Producto A Test', unit='un', category=self.category1)
+        Product.objects.create(sku='P002-TEST', name='Producto B Test', unit='kg', category=self.category1)
         response = api_client_authenticated.get(self.products_url)
         assert response.status_code == 200, f"Error: {response.data}"
-        assert len(response.data) >= 2
-        # Verificar que category_name está en la respuesta
-        if len(response.data) > 0:
-            assert 'category_name' in response.data[0]
-            assert response.data[0]['category_name'] == self.category1.name
+        # Contar solo los productos de test para evitar fallos si otros tests crean productos
+        test_products_in_response = [p for p in response.data if p['sku'].endswith('-TEST') or p['sku'] in ['P001-TEST', 'P002-TEST']]
+        assert len(test_products_in_response) >= 2
+        if len(test_products_in_response) > 0:
+            assert 'category_name' in test_products_in_response[0]
+            assert test_products_in_response[0]['category_name'] == self.category1.name
 
     def test_retrieve_product(self, api_client_authenticated):
         """Prueba obtener el detalle de un producto."""
-        product = Product.objects.create(**self.product_data)
+        # Usar el diccionario preparado para la creación directa del modelo
+        product = Product.objects.create(**self.product_data_for_model_creation)
         detail_url = reverse('product-detail', kwargs={'pk': product.pk})
         response = api_client_authenticated.get(detail_url)
         assert response.status_code == 200, f"Error: {response.data}"
-        # Comparar campos clave. Evitar comparar el objeto serializador completo si hay campos dinámicos como updated_at.
         assert response.data['sku'] == product.sku
         assert response.data['name'] == product.name
         assert response.data['category'] == product.category.pk
@@ -187,36 +195,39 @@ class TestProductAPI:
 
     def test_update_product(self, api_client_authenticated):
         """Prueba actualizar un producto (PUT)."""
-        product = Product.objects.create(**self.product_data)
+        # Usar el diccionario preparado para la creación directa del modelo
+        product = Product.objects.create(**self.product_data_for_model_creation)
         detail_url = reverse('product-detail', kwargs={'pk': product.pk})
-        category2 = Category.objects.create(name='Suturas')
+        category2 = Category.objects.create(name='Suturas Test')
         payload = {
-            'sku': product.sku, # SKU no debería cambiar o ser manejado con cuidado
-            'name': 'Lidocaína 2% Cartucho (Actualizado)',
-            'description': 'Descripción actualizada.',
-            'unit': 'caja de 50',
+            'sku': product.sku, 
+            'name': 'Lidocaína 2% Cartucho (Actualizado Test)',
+            'description': 'Descripción actualizada para test.',
+            'unit': 'caja de 50 test',
             'category': category2.pk
         }
         response = api_client_authenticated.put(detail_url, payload, format='json')
         assert response.status_code == 200, f"Error: {response.data}"
         product.refresh_from_db()
-        assert product.name == 'Lidocaína 2% Cartucho (Actualizado)'
-        assert product.unit == 'caja de 50'
+        assert product.name == 'Lidocaína 2% Cartucho (Actualizado Test)'
+        assert product.unit == 'caja de 50 test'
         assert product.category == category2
 
     def test_partial_update_product(self, api_client_authenticated):
         """Prueba actualizar parcialmente un producto (PATCH)."""
-        product = Product.objects.create(**self.product_data)
+        # Usar el diccionario preparado para la creación directa del modelo
+        product = Product.objects.create(**self.product_data_for_model_creation)
         detail_url = reverse('product-detail', kwargs={'pk': product.pk})
-        payload = {'name': 'Lidocaína Cartucho Gold'}
+        payload = {'name': 'Lidocaína Cartucho Gold Test'}
         response = api_client_authenticated.patch(detail_url, payload, format='json')
         assert response.status_code == 200, f"Error: {response.data}"
         product.refresh_from_db()
-        assert product.name == 'Lidocaína Cartucho Gold'
+        assert product.name == 'Lidocaína Cartucho Gold Test'
 
     def test_delete_product(self, api_client_authenticated):
         """Prueba eliminar un producto."""
-        product = Product.objects.create(**self.product_data)
+        # Usar el diccionario preparado para la creación directa del modelo
+        product = Product.objects.create(**self.product_data_for_model_creation)
         detail_url = reverse('product-detail', kwargs={'pk': product.pk})
         response = api_client_authenticated.delete(detail_url)
         assert response.status_code == 204, f"Error: {response.data if response.data else ''}"
