@@ -53,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -145,6 +146,17 @@ STATIC_ROOT = BASE_DIR / 'staticfiles' # O también os.path.join(BASE_DIR, 'stat
 # STATICFILES_DIRS = [
 #     BASE_DIR / "static", # Si tienes una carpeta 'static' general en la raíz del proyecto
 # ]
+
+# Configuración para WhiteNoise (optimización para servir estáticos)
+# Asegúrate de que DEBUG = False en producción para que esto tenga efecto.
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    }
+}
+# Si estás usando una versión de Django anterior a 4.2, en lugar de STORAGES,
+# usarías la siguiente línea:
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
