@@ -67,11 +67,63 @@ class TestCategoryAPI:
 
     def test_list_categories(self, api_client_authenticated):
         """Prueba obtener la lista de categorías."""
-        Category.objects.create(name='Equipamiento Dental', description='Equipos para consultorios')
-        Category.objects.create(name='Material de Oficina', description='Papelería y consumibles')
+        Category.objects.create(name='Equipamiento Dental-TEST', description='Equipos para consultorios')
+        Category.objects.create(name='Material de Oficina-TEST', description='Papelería y consumibles')
         response = api_client_authenticated.get(self.categories_url)
         assert response.status_code == 200, f"Error: {response.data}"
-        assert len(response.data) >= 2 # Puede haber otras categorías creadas por otros tests
+        # Ajustamos la aserción para ser más flexible con otros tests
+        test_categories_in_response = [cat for cat in response.data['results'] if isinstance(cat, dict) and cat.get('name', '').endswith('-TEST')]
+        assert len(test_categories_in_response) >= 2
+
+    def test_category_pagination(self, api_client_authenticated):
+        """Prueba la paginación para la lista de categorías."""
+        # Crear más categorías que el PAGE_SIZE (asumiendo PAGE_SIZE=10 de settings)
+        for i in range(12):
+            Category.objects.create(name=f'Categoria Paginada {i}-TEST', description=f'Desc {i}')
+        
+        response = api_client_authenticated.get(self.categories_url)
+        assert response.status_code == 200, f"Error: {response.data}"
+        assert 'count' in response.data
+        assert 'next' in response.data
+        assert 'previous' in response.data
+        assert 'results' in response.data
+        
+        assert len(response.data['results']) == 10 # Asumiendo PAGE_SIZE = 10
+        assert response.data['count'] >= 12 # Debería ser el total de categorías, incluyendo las de este test
+        assert response.data['next'] is not None # Debería haber una página siguiente
+        assert response.data['previous'] is None # Primera página
+
+        # Probar ir a la segunda página
+        response_page2 = api_client_authenticated.get(response.data['next'])
+        assert response_page2.status_code == 200
+        assert len(response_page2.data['results']) >= 2 # Los ítems restantes
+        assert response_page2.data['previous'] is not None
+
+    def test_filter_category_by_name(self, api_client_authenticated):
+        """Prueba filtrar categorías por nombre."""
+        Category.objects.create(name='FiltroNombreExacto-TEST', description='Para test de filtro exacto')
+        Category.objects.create(name='FiltroNombreParcialUno-TEST', description='Para test de filtro parcial')
+        Category.objects.create(name='FiltroNombreParcialDos-TEST', description='Otro para test de filtro parcial')
+        Category.objects.create(name='OtraCategoriaSinFiltro-TEST', description='No debe aparecer')
+
+        # Filtro por nombre exacto (icontains debería funcionar)
+        response = api_client_authenticated.get(self.categories_url, {'name': 'FiltroNombreExacto-TEST'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['name'] == 'FiltroNombreExacto-TEST'
+
+        # Filtro por nombre parcial (icontains)
+        response = api_client_authenticated.get(self.categories_url, {'name': 'FiltroNombreParcial'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 2
+        names_in_response = {cat['name'] for cat in response.data['results']}
+        assert 'FiltroNombreParcialUno-TEST' in names_in_response
+        assert 'FiltroNombreParcialDos-TEST' in names_in_response
+        
+        # Filtro que no encuentra nada
+        response = api_client_authenticated.get(self.categories_url, {'name': 'NombreInexistente123'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 0
 
     def test_retrieve_category(self, api_client_authenticated):
         """Prueba obtener el detalle de una categoría."""
@@ -170,16 +222,155 @@ class TestProductAPI:
 
     def test_list_products(self, api_client_authenticated):
         """Prueba obtener la lista de productos."""
-        Product.objects.create(sku='P001-TEST', name='Producto A Test', unit='un', category=self.category1)
-        Product.objects.create(sku='P002-TEST', name='Producto B Test', unit='kg', category=self.category1)
+        Product.objects.create(sku='P001-LIST-TEST', name='Producto A List Test', unit='un', category=self.category1)
+        Product.objects.create(sku='P002-LIST-TEST', name='Producto B List Test', unit='kg', category=self.category1)
         response = api_client_authenticated.get(self.products_url)
         assert response.status_code == 200, f"Error: {response.data}"
+        
+        assert 'results' in response.data # Paginación devuelve 'results'
+        results = response.data['results']
+        
         # Contar solo los productos de test para evitar fallos si otros tests crean productos
-        test_products_in_response = [p for p in response.data if p['sku'].endswith('-TEST') or p['sku'] in ['P001-TEST', 'P002-TEST']]
+        # Y asegurarse de que los resultados sean diccionarios con 'sku'
+        test_products_in_response = [
+            p for p in results 
+            if isinstance(p, dict) and p.get('sku', '').endswith(('-TEST', '-LIST-TEST'))
+        ]
         assert len(test_products_in_response) >= 2
         if len(test_products_in_response) > 0:
             assert 'category_name' in test_products_in_response[0]
             assert test_products_in_response[0]['category_name'] == self.category1.name
+
+    def test_product_pagination(self, api_client_authenticated):
+        """Prueba la paginación para la lista de productos."""
+        category_for_pagination = Category.objects.create(name='Cat Paginación Prod-TEST')
+        for i in range(12):
+            # Asegurar SKUs únicos para cada producto paginado
+            Product.objects.create(
+                sku=f'PAGPROD{i}-TEST', 
+                name=f'Producto Paginado {i}-TEST', 
+                unit='un', 
+                category=category_for_pagination
+            )
+        
+        response = api_client_authenticated.get(self.products_url)
+        assert response.status_code == 200, f"Error: {response.data}"
+        assert 'count' in response.data
+        assert 'next' in response.data
+        assert 'previous' in response.data
+        assert 'results' in response.data
+        
+        assert len(response.data['results']) == 10 # Asumiendo PAGE_SIZE = 10
+        assert response.data['count'] >= 12
+        assert response.data['next'] is not None
+        assert response.data['previous'] is None
+
+        # Probar ir a la segunda página
+        response_page2 = api_client_authenticated.get(response.data['next'])
+        assert response_page2.status_code == 200
+        assert len(response_page2.data['results']) >= 2 # Los ítems restantes
+        assert response_page2.data['previous'] is not None
+
+    def test_filter_product_by_name(self, api_client_authenticated):
+        """Prueba filtrar productos por nombre."""
+        cat_filter_prod = Category.objects.create(name='Cat Filtro Prod Name-TEST')
+        Product.objects.create(sku='FILTERPRODNAME1-TEST', name='Producto Buscable Exacto-TEST', unit='un', category=cat_filter_prod)
+        Product.objects.create(sku='FILTERPRODNAME2-TEST', name='Producto Buscable Parcial Alfa-TEST', unit='un', category=cat_filter_prod)
+        Product.objects.create(sku='FILTERPRODNAME3-TEST', name='Producto Buscable Parcial Beta-TEST', unit='un', category=cat_filter_prod)
+        Product.objects.create(sku='OTHERPRODNAME-TEST', name='Otro Producto No Buscado-TEST', unit='un', category=cat_filter_prod)
+
+        response = api_client_authenticated.get(self.products_url, {'name': 'Producto Buscable Exacto-TEST'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['name'] == 'Producto Buscable Exacto-TEST'
+
+        response = api_client_authenticated.get(self.products_url, {'name': 'Buscable Parcial'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 2
+        names_in_response = {p['name'] for p in response.data['results']}
+        assert 'Producto Buscable Parcial Alfa-TEST' in names_in_response
+        assert 'Producto Buscable Parcial Beta-TEST' in names_in_response
+
+    def test_filter_product_by_sku(self, api_client_authenticated):
+        """Prueba filtrar productos por SKU (exacto)."""
+        cat_filter_sku = Category.objects.create(name='Cat Filtro SKU-TEST')
+        sku_to_find = 'SKUFILTER001-TEST'
+        Product.objects.create(sku=sku_to_find, name='Producto SKU Test 1-TEST', unit='un', category=cat_filter_sku)
+        Product.objects.create(sku='SKUFILTER002-TEST', name='Producto SKU Test 2-TEST', unit='un', category=cat_filter_sku)
+
+        response = api_client_authenticated.get(self.products_url, {'sku': sku_to_find})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 1
+        assert response.data['results'][0]['sku'] == sku_to_find
+
+    def test_filter_product_by_category_id(self, api_client_authenticated):
+        """Prueba filtrar productos por ID de categoría."""
+        cat_filter_id_A = Category.objects.create(name='Cat Filtro ID A-TEST')
+        cat_filter_id_B = Category.objects.create(name='Cat Filtro ID B-TEST')
+        Product.objects.create(sku='PRODFILTCATA1-TEST', name='Prod Cat A1-TEST', unit='un', category=cat_filter_id_A)
+        Product.objects.create(sku='PRODFILTCATA2-TEST', name='Prod Cat A2-TEST', unit='un', category=cat_filter_id_A)
+        Product.objects.create(sku='PRODFILTCATB1-TEST', name='Prod Cat B1-TEST', unit='un', category=cat_filter_id_B)
+
+        response = api_client_authenticated.get(self.products_url, {'category': cat_filter_id_A.pk})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 2
+        for prod in response.data['results']:
+            assert prod['category'] == cat_filter_id_A.pk
+            assert prod['category_name'] == cat_filter_id_A.name
+
+    def test_filter_product_by_category_name(self, api_client_authenticated):
+        """Prueba filtrar productos por nombre de categoría (parcial)."""
+        cat_filter_cname_X = Category.objects.create(name='Filtro CatNombre X-TEST')
+        cat_filter_cname_Y = Category.objects.create(name='Filtro CatNombre Y-TEST')
+        cat_filter_cname_Z = Category.objects.create(name='Otra Cat Z-TEST')
+        Product.objects.create(sku='PRODFILCATNAME_X1-TEST', name='Prod Filtro CatName X1-TEST', unit='un', category=cat_filter_cname_X)
+        Product.objects.create(sku='PRODFILCATNAME_Y1-TEST', name='Prod Filtro CatName Y1-TEST', unit='un', category=cat_filter_cname_Y)
+        Product.objects.create(sku='PRODFILCATNAME_Z1-TEST', name='Prod Filtro CatName Z1-TEST', unit='un', category=cat_filter_cname_Z)
+
+        response = api_client_authenticated.get(self.products_url, {'category_name': 'Filtro CatNombre'})
+        assert response.status_code == 200
+        assert len(response.data['results']) == 2
+        category_names_in_response = {p['category_name'] for p in response.data['results']}
+        assert 'Filtro CatNombre X-TEST' in category_names_in_response
+        assert 'Filtro CatNombre Y-TEST' in category_names_in_response
+
+    def test_combined_filters_and_pagination(self, api_client_authenticated):
+        """Prueba filtros combinados con paginación para productos."""
+        cat_combined = Category.objects.create(name='Cat Combinado Filtro-TEST')
+        # Crear 12 productos que coincidan con un filtro de nombre, para forzar paginación
+        for i in range(12):
+            Product.objects.create(
+                sku=f'COMBPROD{i}-TEST', 
+                name=f'Producto Combinado Test {i}-TEST', 
+                unit='un', 
+                category=cat_combined
+            )
+        # Crear algunos productos que no coincidan
+        other_cat = Category.objects.create(name='Cat Otro Combinado-TEST')
+        Product.objects.create(sku='NONMATCHPROD1-TEST', name='No Coincide Nombre-TEST', unit='un', category=cat_combined)
+        Product.objects.create(sku='NONMATCHPROD2-TEST', name='Producto Combinado Test OtroCat-TEST', unit='un', category=other_cat)
+
+        # Filtrar por nombre (debería haber 12) y categoría
+        params = {'name': 'Producto Combinado Test', 'category': cat_combined.pk}
+        response = api_client_authenticated.get(self.products_url, params)
+        assert response.status_code == 200
+        assert 'count' in response.data
+        assert response.data['count'] == 12 # Exactamente 12 productos coinciden con ambos filtros
+        assert len(response.data['results']) == 10 # Primera página
+        assert response.data['next'] is not None
+
+        # Verificar que todos los resultados de la primera página coincidan
+        for prod in response.data['results']:
+            assert 'Producto Combinado Test' in prod['name']
+            assert prod['category'] == cat_combined.pk
+        
+        # Ir a la segunda página
+        response_page2 = api_client_authenticated.get(response.data['next'])
+        assert response_page2.status_code == 200
+        assert len(response_page2.data['results']) == 2 # Los 2 restantes
+        for prod in response_page2.data['results']:
+            assert 'Producto Combinado Test' in prod['name']
+            assert prod['category'] == cat_combined.pk
 
     def test_retrieve_product(self, api_client_authenticated):
         """Prueba obtener el detalle de un producto."""

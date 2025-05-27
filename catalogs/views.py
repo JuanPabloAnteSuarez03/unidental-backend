@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions
 from .models import Category, Product
 from .serializers import CategorySerializer, ProductSerializer
+from .filters import CategoryFilter, ProductFilter
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
@@ -17,6 +18,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
     permission_classes = [permissions.IsAuthenticated] # Proteger por defecto, ajustar según necesidad
+    filterset_class = CategoryFilter
 
     @swagger_auto_schema(
         operation_summary="Crear una nueva categoría",
@@ -39,11 +41,15 @@ class CategoryViewSet(viewsets.ModelViewSet):
         """Crea una nueva categoría de productos."""
         return super().create(request, *args, **kwargs)
 
-    # Puedes añadir @swagger_auto_schema a otros métodos (list, retrieve, update, destroy) si quieres personalizar más sus descripciones o ejemplos.
-    # Por defecto, drf-yasg usará los docstrings de los métodos y el serializador para generar la documentación.
-    @swagger_auto_schema(operation_summary="Listar todas las categorías")
+    @swagger_auto_schema(operation_summary="Listar todas las categorías", 
+                         manual_parameters=[
+                             openapi.Parameter('name', openapi.IN_QUERY, description="Filtrar categorías por nombre (búsqueda parcial)", type=openapi.TYPE_STRING),
+                         ])
     def list(self, request, *args, **kwargs):
-        """Obtiene una lista de todas las categorías de productos disponibles."""
+        """Obtiene una lista de todas las categorías de productos disponibles.
+        
+        Puedes filtrar por nombre usando el parámetro `?name=textobusqueda`.
+        """
         return super().list(request, *args, **kwargs)
 
     @swagger_auto_schema(operation_summary="Obtener detalle de una categoría")
@@ -76,6 +82,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated] # Proteger por defecto
+    filterset_class = ProductFilter
 
     @swagger_auto_schema(
         operation_summary="Crear un nuevo producto",
@@ -104,9 +111,22 @@ class ProductViewSet(viewsets.ModelViewSet):
         """Crea un nuevo producto. El SKU debe ser único y la categoría debe existir."""
         return super().create(request, *args, **kwargs)
     
-    @swagger_auto_schema(operation_summary="Listar todos los productos")
+    @swagger_auto_schema(operation_summary="Listar todos los productos",
+                         manual_parameters=[
+                             openapi.Parameter('name', openapi.IN_QUERY, description="Filtrar productos por nombre (búsqueda parcial)", type=openapi.TYPE_STRING),
+                             openapi.Parameter('sku', openapi.IN_QUERY, description="Filtrar productos por SKU (exacto)", type=openapi.TYPE_STRING),
+                             openapi.Parameter('category', openapi.IN_QUERY, description="Filtrar productos por ID de categoría", type=openapi.TYPE_INTEGER),
+                             openapi.Parameter('category_name', openapi.IN_QUERY, description="Filtrar productos por nombre de categoría (búsqueda parcial)", type=openapi.TYPE_STRING),
+                         ])
     def list(self, request, *args, **kwargs):
-        """Obtiene una lista de todos los productos. Puedes implementar filtros aquí (ej. por categoría)."""
+        """Obtiene una lista de todos los productos.
+        
+        Filtros disponibles:
+        - `?name=textobusqueda` (búsqueda parcial en nombre de producto)
+        - `?sku=codigosku` (búsqueda exacta de SKU)
+        - `?category=id_categoria` (ID exacto de la categoría)
+        - `?category_name=nombrecategoria` (búsqueda parcial en nombre de categoría)
+        """
         return super().list(request, *args, **kwargs)
 
     @swagger_auto_schema(operation_summary="Obtener detalle de un producto")
