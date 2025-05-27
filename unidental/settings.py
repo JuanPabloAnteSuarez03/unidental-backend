@@ -33,7 +33,22 @@ SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=lambda v: [s.strip() for s in v.split(',')])
+ALLOWED_HOSTS_STRING = config('ALLOWED_HOSTS', default='127.0.0.1,localhost')
+ALLOWED_HOSTS = [s.strip() for s in ALLOWED_HOSTS_STRING.split(',')]
+
+# CSRF Configuration for HTTPS
+# Asegúrate de que la URL de tu sitio de producción esté aquí
+# Puedes leerla de una variable de entorno si cambia entre entornos
+CSRF_TRUSTED_ORIGINS_STRING = config('CSRF_TRUSTED_ORIGINS', default='https://unidental-backend-production.up.railway.app')
+CSRF_TRUSTED_ORIGINS = [s.strip() for s in CSRF_TRUSTED_ORIGINS_STRING.split(',')]
+
+# Para confiar en la cabecera X-Forwarded-Proto de proxies como los de Railway
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Configuración de Cookies para producción HTTPS
+# Estas se activarán si DEBUG es False, o si las variables de entorno las fuerzan a True
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
 
 
 # Application definition
