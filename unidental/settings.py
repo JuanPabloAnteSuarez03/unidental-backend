@@ -64,6 +64,14 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'drf_yasg',
     'djoser',
+    'core',
+    'catalogs',
+    'credits',
+    'sales',
+    'deliveries',
+    'inventory',
+    'purchases',
+    'suppliers',
 ]
 
 MIDDLEWARE = [
