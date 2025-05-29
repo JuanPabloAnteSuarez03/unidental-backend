@@ -1,4 +1,5 @@
 from django.db import models
+from .validators import validate_sku
 
 # Create your models here.
 
@@ -45,7 +46,17 @@ class Product(models.Model):
         unique=True, 
         null=False, 
         blank=False,
-        verbose_name="SKU (Código Único de Producto)"
+        verbose_name="SKU (Código Único de Producto)",
+        validators=[validate_sku],
+        help_text="Formato: CATEGORIA-SUBCATEGORIA-TIPO-SECUENCIAL (ej: ART-PRE-BIO-001)"
+    )
+    barcode = models.CharField(
+        max_length=100,  # Los códigos de barras pueden ser largos, ej. Code 128
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Código de Barras",
+        help_text="Código de barras del producto (EAN, UPC, etc.) si aplica."
     )
     name = models.CharField(
         max_length=200, 

@@ -27,6 +27,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'sku',
+            'barcode',
             'name',
             'description',
             'unit',
