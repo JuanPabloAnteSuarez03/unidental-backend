@@ -123,8 +123,8 @@ else:
             conn_max_age=600,
             # Ajusta ssl_require según la configuración de tu Supabase si es necesario
             # ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool) 
-        )
-    }
+    )
+}
 
 
 # Password validation
