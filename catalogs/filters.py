@@ -19,15 +19,17 @@ class ProductFilter(django_filters.FilterSet):
     Permite filtrar productos por:
     - Nombre (búsqueda parcial insensible a mayúsculas)
     - SKU (búsqueda exacta)
+    - Código de Barras (búsqueda exacta)
     - ID de Categoría
     - Nombre de Categoría (búsqueda parcial insensible a mayúsculas en el nombre de la categoría relacionada)
     """
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
     sku = django_filters.CharFilter(field_name='sku', lookup_expr='exact')
+    barcode = django_filters.CharFilter(field_name='barcode', lookup_expr='exact')
     category = django_filters.NumberFilter(field_name='category__id') # Filtra por el ID de la categoría
     category_name = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
     # Podrías añadir filtros por 'unit', etc.
 
     class Meta:
         model = Product
-        fields = ['name', 'sku', 'category', 'category_name'] 
+        fields = ['name', 'sku', 'barcode', 'category', 'category_name'] 
