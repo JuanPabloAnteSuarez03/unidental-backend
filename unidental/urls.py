@@ -41,4 +41,5 @@ urlpatterns = [
     path('api/auth/', include('djoser.urls')),
     path('api/auth/', include('djoser.urls.authtoken')),
     path('api/catalogs/', include('catalogs.urls')),
+    path('api/suppliers/', include('suppliers.urls')),
 ]
