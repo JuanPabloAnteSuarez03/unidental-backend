@@ -91,7 +91,7 @@ ROOT_URLCONF = 'unidental.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -204,10 +204,22 @@ REST_FRAMEWORK = {
 
 # Djoser settings (opcional, para personalización)
 DJOSER = {
-    # 'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
-    # 'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
-    # 'ACTIVATION_URL': 'activate/{uid}/{token}',
-    # 'SEND_ACTIVATION_EMAIL': False, # Cambiar a True si quieres activación por email
+    'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
+    'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
+    'ACTIVATION_URL': 'activate/{uid}/{token}',
+    'SEND_ACTIVATION_EMAIL': False, # Cambiar a True si quieres activación por email
+    'SEND_CONFIRMATION_EMAIL': False,
+    'PASSWORD_RESET_CONFIRM_RETRY_URL': 'password/reset/confirm/{uid}/{token}',
+    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': True,
+    'PASSWORD_RESET_CONFIRM_RETYPE': True,
+    'SET_PASSWORD_RETYPE': True,
+    'USERNAME_RESET_CONFIRM_RETYPE': True,
+    'EMAIL': {
+        'password_reset': 'core.email.PasswordResetEmail',
+        'password_changed_confirmation': 'djoser.email.PasswordChangedConfirmationEmail',
+        'username_changed_confirmation': 'djoser.email.UsernameChangedConfirmationEmail',
+        'username_reset': 'djoser.email.UsernameResetEmail',
+    },
     # 'SERIALIZERS': {
     #     'user_create': 'your_app.serializers.UserCreateSerializer', # Ejemplo para personalizar
     #     'user': 'your_app.serializers.UserSerializer',
@@ -216,3 +228,25 @@ DJOSER = {
     # 'USER_ID_FIELD': 'id', # o el campo que uses como ID de usuario
     # 'LOGIN_FIELD': 'email', # o 'username'
 }
+
+# Email Configuration
+# ====================
+if DEBUG:
+    # En desarrollo: mostrar emails en la consola
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    # En producción: usar SMTP
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+    EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+    EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+    EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+
+# Configuraciones generales de email
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@unidental.com')
+SERVER_EMAIL = config('SERVER_EMAIL', default='admin@unidental.com')
+EMAIL_SUBJECT_PREFIX = '[UNIDENTAL] '
+
+# Configuración adicional para emails HTML
+EMAIL_USE_LOCALTIME = True
