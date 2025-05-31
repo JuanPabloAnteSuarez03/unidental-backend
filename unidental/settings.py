@@ -91,7 +91,7 @@ ROOT_URLCONF = 'unidental.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -215,7 +215,7 @@ DJOSER = {
     'SET_PASSWORD_RETYPE': True,
     'USERNAME_RESET_CONFIRM_RETYPE': True,
     'EMAIL': {
-        'password_reset': 'djoser.email.PasswordResetEmail',
+        'password_reset': 'core.email.PasswordResetEmail',
         'password_changed_confirmation': 'djoser.email.PasswordChangedConfirmationEmail',
         'username_changed_confirmation': 'djoser.email.UsernameChangedConfirmationEmail',
         'username_reset': 'djoser.email.UsernameResetEmail',
