@@ -77,7 +77,8 @@ class TestCategoryAPI:
 
     def test_category_pagination(self, api_client_authenticated):
         """Prueba la paginación para la lista de categorías."""
-        for i in range(12):
+        # Crear 30 categorías para asegurar que la paginación funcione (PAGE_SIZE es 25)
+        for i in range(30):
             Category.objects.create(name=f'Categoria Paginada {i}-TEST', description=f'Desc {i}')
         
         response = api_client_authenticated.get(self.categories_url)
@@ -87,8 +88,9 @@ class TestCategoryAPI:
         assert 'previous' in response.data
         assert 'results' in response.data
         
-        assert len(response.data['results']) == 10
-        assert response.data['count'] >= 12
+        # Con PAGE_SIZE=25, debe devolver 25 items en la primera página
+        assert len(response.data['results']) == 25
+        assert response.data['count'] >= 30
         assert response.data['next'] is not None
         assert response.data['previous'] is None
 
