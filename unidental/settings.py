@@ -91,6 +91,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # o el dominio de tu frontend real
     "https://unidental-frontend.vercel.app",
+    "https://pruebas-frontend-unidental.vercel.app",
 ]
 ROOT_URLCONF = 'unidental.urls'
 
