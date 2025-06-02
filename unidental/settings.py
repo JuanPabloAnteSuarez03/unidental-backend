@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'drf_yasg',
     'djoser',
+    'corsheaders',
     'django_filters',
     'core',
     'catalogs',
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -86,7 +88,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # o el dominio de tu frontend real
+    "https://unidental-frontend.vercel.app",
+]
 ROOT_URLCONF = 'unidental.urls'
+
+CORS_ALLOW_CREDENTIALS = True
+
 
 TEMPLATES = [
     {
