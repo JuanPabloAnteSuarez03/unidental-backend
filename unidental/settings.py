@@ -214,7 +214,7 @@ REST_FRAMEWORK = {
 
 # Djoser settings (opcional, para personalización)
 DJOSER = {
-    'PASSWORD_RESET_CONFIRM_URL': 'password-reset/confirm/{uid}/{token}',  # Esta URL será ignorada por nuestra plantilla personalizada
+    'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': False, # Cambiar a True si quieres activación por email
