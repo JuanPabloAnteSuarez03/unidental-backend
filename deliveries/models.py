@@ -118,11 +118,12 @@ class Delivery(models.Model):
             raise ValidationError('No se puede entregar una entrega que ya fue entregada.')
         
         self.status = 'delivered'
-        self.delivered_at = timezone.now()
+        now = timezone.now()
+        self.delivered_at = now
         
-        # Si no tiene fecha de envío, la establecemos ahora
+        # Si no tiene fecha de envío, la establecemos al mismo tiempo
         if not self.shipped_at:
-            self.shipped_at = timezone.now()
+            self.shipped_at = now
         
         self._skip_validation = True
         self.save()
