@@ -13,10 +13,14 @@ class PasswordResetEmail(email.PasswordResetEmail):
         # Obtenemos el contexto base de Djoser que ya tiene todo configurado
         context = super().get_context_data()
         
-        # Solo agregamos nuestras variables adicionales
+        # Agregamos nuestras variables adicionales
         context['from_email'] = settings.DEFAULT_FROM_EMAIL
         
         return context
+    
+    def get_subject(self):
+        # Usar directamente nuestro subject personalizado
+        return "UNIDENTAL - Reinicio de Contraseña"
 
 
 class PasswordResetEmailPlainText(email.BaseEmailMessage):
