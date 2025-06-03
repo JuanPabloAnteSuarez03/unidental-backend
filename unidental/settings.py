@@ -214,7 +214,7 @@ REST_FRAMEWORK = {
 
 # Djoser settings (opcional, para personalización)
 DJOSER = {
-    'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
+    'PASSWORD_RESET_CONFIRM_URL': 'password-reset/confirm/{uid}/{token}',  # Esta URL será ignorada por nuestra plantilla personalizada
     'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': False, # Cambiar a True si quieres activación por email
@@ -223,6 +223,9 @@ DJOSER = {
     'PASSWORD_RESET_CONFIRM_RETYPE': True,
     'SET_PASSWORD_RETYPE': True,
     'USERNAME_RESET_CONFIRM_RETYPE': True,
+    'EMAIL': {
+        'password_reset': 'core.email.PasswordResetEmail',
+    },
     # 'SERIALIZERS': {
     #     'user_create': 'your_app.serializers.UserCreateSerializer', # Ejemplo para personalizar
     #     'user': 'your_app.serializers.UserSerializer',
