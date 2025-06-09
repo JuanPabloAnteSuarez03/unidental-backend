@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view, permission_classes as perm_decorator
+from rest_framework.decorators import api_view, permission_classes as perm_decorator, action
 from rest_framework.response import Response
 from .models import Category, Product
 from .serializers import CategorySerializer, ProductSerializer
@@ -82,7 +82,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     Permite CRUD de productos. Cada producto debe estar asociado a una categoría.
     El SKU (Stock Keeping Unit) debe ser único para cada producto.
     """
-    queryset = Product.objects.all()
+    queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated] # Proteger por defecto
     filterset_class = ProductFilter
@@ -155,6 +155,50 @@ class ProductViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """Elimina un producto existente por su ID."""
         return super().destroy(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener todos los productos sin paginación",
+        operation_description="Devuelve todos los productos de la base de datos sin paginación. Útil para cargar listas completas en el frontend.",
+        manual_parameters=[
+            openapi.Parameter('name', openapi.IN_QUERY, description="Filtrar productos por nombre (búsqueda parcial)", type=openapi.TYPE_STRING),
+            openapi.Parameter('sku', openapi.IN_QUERY, description="Filtrar productos por SKU (exacto)", type=openapi.TYPE_STRING),
+            openapi.Parameter('barcode', openapi.IN_QUERY, description="Filtrar productos por código de barras (exacto)", type=openapi.TYPE_STRING),
+            openapi.Parameter('category', openapi.IN_QUERY, description="Filtrar productos por ID de categoría", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('category_name', openapi.IN_QUERY, description="Filtrar productos por nombre de categoría (búsqueda parcial)", type=openapi.TYPE_STRING),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Lista completa de productos obtenida exitosamente",
+                schema=ProductSerializer(many=True)
+            )
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def all(self, request):
+        """
+        Endpoint que devuelve todos los productos sin paginación.
+        
+        Este endpoint aplica los mismos filtros que el endpoint list(),
+        pero devuelve todos los resultados sin paginar.
+        
+        Filtros disponibles:
+        - ?name=textobusqueda (búsqueda parcial en nombre de producto)
+        - ?sku=codigosku (búsqueda exacta de SKU)
+        - ?barcode=codigobarras (búsqueda exacta de código de barras)
+        - ?category=id_categoria (ID exacto de la categoría)
+        - ?category_name=nombrecategoria (búsqueda parcial en nombre de categoría)
+        """
+        # Aplicar filtros usando el filterset configurado
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Serializar todos los productos sin paginación
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            'count': queryset.count(),
+            'results': serializer.data
+        })
 
 @swagger_auto_schema(
     method='get',
