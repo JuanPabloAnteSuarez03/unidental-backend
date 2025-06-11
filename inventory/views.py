@@ -128,6 +128,48 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
         serializer = StockSummarySerializer(result, many=True)
         return Response(serializer.data)
 
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener todo el stock sin paginación",
+        operation_description="Devuelve todo el stock de inventario sin paginación. Útil para cargar listas completas en el frontend.",
+        manual_parameters=[
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location__type', openapi.IN_QUERY, description="Tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Buscar por producto o ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('min_quantity', openapi.IN_QUERY, description="Cantidad mínima", type=openapi.TYPE_INTEGER),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Lista completa de stock obtenida exitosamente",
+                schema=InventoryStockSerializer(many=True)
+            )
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def all(self, request):
+        """
+        Endpoint que devuelve todo el stock sin paginación.
+        
+        Este endpoint aplica los mismos filtros que el endpoint list(),
+        pero devuelve todos los resultados sin paginar.
+        
+        Filtros disponibles:
+        - ?location=id_ubicacion (ID de la ubicación)
+        - ?location__type=tipo (Tipo de ubicación: sede/bodega)
+        - ?search=texto (búsqueda por producto o ubicación)
+        - ?min_quantity=cantidad (cantidad mínima)
+        """
+        # Aplicar filtros usando el filterset configurado
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Serializar todo el stock sin paginación
+        serializer = self.get_serializer(queryset, many=True)
+        
+        return Response({
+            'count': queryset.count(),
+            'results': serializer.data
+        })
+
 
 class InventoryMovementViewSet(viewsets.ModelViewSet):
     """ViewSet para gestionar movimientos de inventario."""
