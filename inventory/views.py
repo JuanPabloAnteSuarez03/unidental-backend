@@ -16,6 +16,7 @@ from .serializers import (
     LocationSerializer, InventoryStockSerializer, InventoryMovementSerializer,
     StockAlertSerializer, ExpiryAlertSerializer, StockSummarySerializer
 )
+from .filters import LocationFilter, InventoryStockFilter, InventoryMovementFilter
 from catalogs.models import Product
 
 
@@ -26,7 +27,7 @@ class LocationViewSet(viewsets.ModelViewSet):
     serializer_class = LocationSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['type']
+    filterset_class = LocationFilter
     search_fields = ['name', 'address']
     ordering_fields = ['name', 'type', 'created_at']
     ordering = ['type', 'name']
@@ -60,7 +61,7 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
     serializer_class = InventoryStockSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['location', 'location__type']
+    filterset_class = InventoryStockFilter
     search_fields = ['product__name', 'product__sku', 'location__name']
     ordering_fields = ['quantity', 'last_updated', 'product__name']
     ordering = ['product__name']
@@ -69,26 +70,21 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
         operation_description="Obtener lista de stock con filtros por ubicación y producto",
         manual_parameters=[
             openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación", type=openapi.TYPE_INTEGER),
-            openapi.Parameter('location__type', openapi.IN_QUERY, description="Tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
-            openapi.Parameter('search', openapi.IN_QUERY, description="Buscar por producto o ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_type', openapi.IN_QUERY, description="Tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_name', openapi.IN_QUERY, description="Buscar por nombre de ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product_name', openapi.IN_QUERY, description="Buscar por nombre de producto", type=openapi.TYPE_STRING),
+            openapi.Parameter('product_sku', openapi.IN_QUERY, description="Buscar por SKU del producto", type=openapi.TYPE_STRING),
+            openapi.Parameter('product_category', openapi.IN_QUERY, description="ID de categoría del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product_category_name', openapi.IN_QUERY, description="Buscar por nombre de categoría", type=openapi.TYPE_STRING),
             openapi.Parameter('min_quantity', openapi.IN_QUERY, description="Cantidad mínima", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('max_quantity', openapi.IN_QUERY, description="Cantidad máxima", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('has_stock', openapi.IN_QUERY, description="Solo productos con stock (true) o sin stock (false)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Búsqueda general en producto y ubicación", type=openapi.TYPE_STRING),
         ]
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        
-        # Filtro por cantidad mínima
-        min_quantity = self.request.query_params.get('min_quantity')
-        if min_quantity is not None:
-            try:
-                queryset = queryset.filter(quantity__gte=int(min_quantity))
-            except ValueError:
-                pass
-        
-        return queryset
 
     @swagger_auto_schema(
         method='get',
@@ -134,9 +130,17 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
         operation_description="Devuelve todo el stock de inventario sin paginación. Útil para cargar listas completas en el frontend.",
         manual_parameters=[
             openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación", type=openapi.TYPE_INTEGER),
-            openapi.Parameter('location__type', openapi.IN_QUERY, description="Tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
-            openapi.Parameter('search', openapi.IN_QUERY, description="Buscar por producto o ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_type', openapi.IN_QUERY, description="Tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_name', openapi.IN_QUERY, description="Buscar por nombre de ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product_name', openapi.IN_QUERY, description="Buscar por nombre de producto", type=openapi.TYPE_STRING),
+            openapi.Parameter('product_sku', openapi.IN_QUERY, description="Buscar por SKU del producto", type=openapi.TYPE_STRING),
+            openapi.Parameter('product_category', openapi.IN_QUERY, description="ID de categoría del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product_category_name', openapi.IN_QUERY, description="Buscar por nombre de categoría", type=openapi.TYPE_STRING),
             openapi.Parameter('min_quantity', openapi.IN_QUERY, description="Cantidad mínima", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('max_quantity', openapi.IN_QUERY, description="Cantidad máxima", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('has_stock', openapi.IN_QUERY, description="Solo productos con stock (true) o sin stock (false)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Búsqueda general en producto y ubicación", type=openapi.TYPE_STRING),
         ],
         responses={
             200: openapi.Response(
@@ -155,9 +159,17 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
         
         Filtros disponibles:
         - ?location=id_ubicacion (ID de la ubicación)
-        - ?location__type=tipo (Tipo de ubicación: sede/bodega)
-        - ?search=texto (búsqueda por producto o ubicación)
+        - ?location_type=tipo (Tipo de ubicación: sede/bodega)
+        - ?location_name=nombre (búsqueda por nombre de ubicación)
+        - ?product=id_producto (ID del producto específico)
+        - ?product_name=nombre (búsqueda por nombre de producto)
+        - ?product_sku=sku (búsqueda por SKU del producto)
+        - ?product_category=id (ID de categoría del producto)
+        - ?product_category_name=nombre (búsqueda por nombre de categoría)
         - ?min_quantity=cantidad (cantidad mínima)
+        - ?max_quantity=cantidad (cantidad máxima)
+        - ?has_stock=true/false (solo productos con/sin stock)
+        - ?search=texto (búsqueda general en producto y ubicación)
         """
         # Aplicar filtros usando el filterset configurado
         queryset = self.filter_queryset(self.get_queryset())
@@ -180,7 +192,7 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
     serializer_class = InventoryMovementSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['movement_type', 'location', 'product']
+    filterset_class = InventoryMovementFilter
     search_fields = ['product__name', 'product__sku', 'location__name', 'notes']
     ordering_fields = ['occurred_at', 'quantity']
     ordering = ['-occurred_at']
