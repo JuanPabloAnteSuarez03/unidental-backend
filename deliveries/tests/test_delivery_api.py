@@ -89,6 +89,7 @@ def test_data():
     # Crear venta
     sale = Sale.objects.create(
         customer=customer,
+        location=origin_location,
         sale_type='normal',
         should_invoice=True
     )
@@ -321,6 +322,7 @@ class TestDeliveryAPI:
         # Crear segunda venta y entrega
         sale2 = Sale.objects.create(
             customer=test_data['customer'],
+            location=test_data['origin_location'],
             sale_type='normal',
             should_invoice=True
         )
@@ -426,6 +428,7 @@ class TestDeliveryAPI:
         
         sale2 = Sale.objects.create(
             customer=test_data['customer'],
+            location=test_data['origin_location'],
             sale_type='normal',
             should_invoice=True
         )

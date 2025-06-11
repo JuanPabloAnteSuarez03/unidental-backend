@@ -99,6 +99,7 @@ def sample_deliveries(customer, another_customer, product, origin_location,
     # Crear varias ventas
     sale1 = Sale.objects.create(
         customer=customer,
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=True
     )
@@ -106,6 +107,7 @@ def sample_deliveries(customer, another_customer, product, origin_location,
     
     sale2 = Sale.objects.create(
         customer=another_customer,
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=True
     )
@@ -113,6 +115,7 @@ def sample_deliveries(customer, another_customer, product, origin_location,
     
     sale3 = Sale.objects.create(
         customer=customer,
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=False
     )

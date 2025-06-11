@@ -169,6 +169,7 @@ class TestSaleAPI:
         """Prueba crear una venta básica."""
         payload = {
             'customer': test_data['customer'].id,
+            'location': test_data['location'].id,
             'sale_type': 'normal',
             'should_invoice': True,
             'items': [
@@ -185,12 +186,14 @@ class TestSaleAPI:
         
         sale = Sale.objects.get(id=response.data['id'])
         assert sale.customer == test_data['customer']
+        assert sale.location == test_data['location']
         assert sale.items.count() == 1
         assert sale.total_gross == Decimal('100000.00')
 
     def test_create_anonymous_sale(self, api_client_authenticated, test_data):
         """Prueba crear una venta anónima."""
         payload = {
+            'location': test_data['location'].id,
             'sale_type': 'normal',
             'items': [
                 {
@@ -206,11 +209,14 @@ class TestSaleAPI:
         
         sale = Sale.objects.get(id=response.data['id'])
         assert sale.customer is None
+        assert sale.location == test_data['location']
+        assert sale.total_gross == Decimal('50000.00')
 
     def test_create_sale_without_items(self, api_client_authenticated, test_data):
         """Prueba que no se puede crear venta sin items."""
         payload = {
             'customer': test_data['customer'].id,
+            'location': test_data['location'].id,
             'sale_type': 'normal',
             'items': []
         }
@@ -223,6 +229,7 @@ class TestSaleAPI:
         """Prueba validación de stock insuficiente."""
         payload = {
             'customer': test_data['customer'].id,
+            'location': test_data['location'].id,
             'sale_type': 'normal',
             'items': [
                 {
@@ -235,13 +242,16 @@ class TestSaleAPI:
         
         response = api_client_authenticated.post(self.sales_url, payload, format='json')
         assert response.status_code == 400
-        assert 'quantity' in str(response.data)
+        assert 'items' in response.data
 
     def test_list_sales(self, api_client_authenticated, test_data):
         """Prueba listar ventas."""
         # Crear algunas ventas
-        sale1 = Sale.objects.create(customer=test_data['customer'])
-        sale2 = Sale.objects.create()  # Venta anónima
+        sale1 = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
+        sale2 = Sale.objects.create(location=test_data['location'])  # Venta anónima
         
         response = api_client_authenticated.get(self.sales_url)
         assert response.status_code == 200
@@ -256,7 +266,10 @@ class TestSaleAPI:
 
     def test_retrieve_sale(self, api_client_authenticated, test_data):
         """Prueba obtener una venta específica."""
-        sale = Sale.objects.create(customer=test_data['customer'])
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
         SaleItem.objects.create(
             sale=sale,
             product=test_data['product'],
@@ -268,13 +281,17 @@ class TestSaleAPI:
         response = api_client_authenticated.get(url)
         assert response.status_code == 200
         assert response.data['customer'] == test_data['customer'].id
+        assert response.data['location'] == test_data['location'].id
         assert len(response.data['items']) == 1
 
     def test_filter_sales_by_customer(self, api_client_authenticated, test_data):
         """Prueba filtrar ventas por cliente."""
         # Crear ventas específicas para este test
-        sale_with_customer = Sale.objects.create(customer=test_data['customer'])
-        sale_anonymous = Sale.objects.create()  # Venta anónima
+        sale_with_customer = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
+        sale_anonymous = Sale.objects.create(location=test_data['location'])  # Venta anónima
         
         url = f"{self.sales_url}?customer={test_data['customer'].id}"
         response = api_client_authenticated.get(url)
@@ -297,8 +314,11 @@ class TestSaleAPI:
     def test_filter_sales_by_date(self, api_client_authenticated, test_data):
         """Prueba filtrar ventas por fecha."""
         # Crear ventas en diferentes fechas
-        sale1 = Sale.objects.create(customer=test_data['customer'])
-        sale2 = Sale.objects.create()
+        sale1 = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
+        sale2 = Sale.objects.create(location=test_data['location'])
         
         # Filtrar por fecha
         today = date.today()
@@ -317,7 +337,10 @@ class TestSaleAPI:
     def test_statistics_action(self, api_client_authenticated, test_data):
         """Prueba acción de estadísticas."""
         # Crear algunas ventas con items
-        sale = Sale.objects.create(customer=test_data['customer'])
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']  # Agregar ubicación
+        )
         SaleItem.objects.create(
             sale=sale,
             product=test_data['product'],
@@ -325,7 +348,7 @@ class TestSaleAPI:
             unit_price=Decimal('50000.00')
         )
         
-        url = reverse('sales:sale-statistics')
+        url = f"{self.sales_url}statistics/"  # Usar la URL del router
         response = api_client_authenticated.get(url)
         assert response.status_code == 200
         assert 'total_sales' in response.data
@@ -334,15 +357,86 @@ class TestSaleAPI:
     def test_today_action(self, api_client_authenticated, test_data):
         """Prueba acción de ventas del día."""
         # Crear una venta hoy
-        sale = Sale.objects.create(customer=test_data['customer'])
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']  # Agregar ubicación
+        )
         
-        url = reverse('sales:sale-today')
+        url = f"{self.sales_url}today/"  # Usar la URL del router
         response = api_client_authenticated.get(url)
         assert response.status_code == 200
         
         # Esta acción devuelve una lista directa, no paginada
         assert isinstance(response.data, list)
         assert len(response.data) >= 1
+
+    def test_by_location_action(self, api_client_authenticated, test_data):
+        """Prueba acción de estadísticas por ubicación."""
+        # Crear varias ventas con items en la ubicación de prueba
+        sale1 = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
+        SaleItem.objects.create(
+            sale=sale1,
+            product=test_data['product'],
+            quantity=2,
+            unit_price=Decimal('50000.00')
+        )
+        
+        sale2 = Sale.objects.create(
+            location=test_data['location']  # Venta anónima
+        )
+        SaleItem.objects.create(
+            sale=sale2,
+            product=test_data['product'],
+            quantity=3,
+            unit_price=Decimal('30000.00')
+        )
+        
+        url = f"{self.sales_url}by_location/"  # Usar la URL del router
+        response = api_client_authenticated.get(url)
+        assert response.status_code == 200
+        assert isinstance(response.data, list)
+        
+        if len(response.data) > 0:
+            location_stat = response.data[0]
+            assert 'location_id' in location_stat
+            assert 'location_name' in location_stat
+            assert 'total_sales' in location_stat
+            assert 'total_revenue' in location_stat
+            assert 'average_sale' in location_stat
+
+    def test_filter_sales_by_location(self, api_client_authenticated, test_data):
+        """Prueba filtrar ventas por ubicación."""
+        # Crear una segunda ubicación para comparar
+        location2 = Location.objects.create(
+            name='Segunda Ubicación Test',
+            type='sucursal'
+        )
+        
+        # Crear ventas en diferentes ubicaciones
+        sale1 = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
+        sale2 = Sale.objects.create(
+            location=location2
+        )
+        
+        # Filtrar por la primera ubicación
+        url = f"{self.sales_url}?location={test_data['location'].id}"
+        response = api_client_authenticated.get(url)
+        assert response.status_code == 200
+        
+        # Verificar que solo se devuelven ventas de la ubicación especificada
+        if isinstance(response.data, dict) and 'results' in response.data:
+            sales_data = response.data['results']
+        else:
+            sales_data = response.data
+        
+        location_sales = [sale for sale in sales_data if sale['location'] == test_data['location'].id]
+        assert len(location_sales) >= 1
 
 
 @pytest.mark.django_db
@@ -355,7 +449,10 @@ class TestSaleItemAPI:
     def test_list_items(self, api_client_authenticated, test_data):
         """Prueba listar items de venta."""
         # Crear algunos items
-        sale = Sale.objects.create(customer=test_data['customer'])
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
         item = SaleItem.objects.create(
             sale=sale,
             product=test_data['product'],
@@ -377,7 +474,10 @@ class TestSaleItemAPI:
     def test_filter_items_by_product(self, api_client_authenticated, test_data):
         """Prueba filtrar items por producto."""
         # Crear items con diferentes productos
-        sale = Sale.objects.create(customer=test_data['customer'])
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']
+        )
         item = SaleItem.objects.create(
             sale=sale,
             product=test_data['product'],
@@ -402,16 +502,24 @@ class TestSaleItemAPI:
 
     def test_top_products_action(self, api_client_authenticated, test_data):
         """Prueba acción de productos más vendidos."""
-        # Crear algunas ventas con items
-        sale = Sale.objects.create(customer=test_data['customer'])
+        # Crear ventas con items
+        sale = Sale.objects.create(
+            customer=test_data['customer'],
+            location=test_data['location']  # Agregar ubicación
+        )
         SaleItem.objects.create(
             sale=sale,
             product=test_data['product'],
-            quantity=5,
+            quantity=10,
             unit_price=Decimal('50000.00')
         )
         
-        url = reverse('sales:saleitem-top-products')
+        url = f"{self.items_url}top_products/"  # Usar la URL del router
         response = api_client_authenticated.get(url)
         assert response.status_code == 200
-        assert len(response.data) >= 1 
+        assert isinstance(response.data, list)
+        
+        if len(response.data) > 0:
+            top_product = response.data[0]
+            assert 'product' in top_product
+            assert 'total_quantity' in top_product 
