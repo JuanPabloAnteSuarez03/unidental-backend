@@ -62,6 +62,7 @@ def test_data():
     # Crear venta
     sale = Sale.objects.create(
         customer=customer,
+        location=location,
         sale_type='normal',
         total_gross=Decimal('100000.00'),
         total_net=Decimal('100000.00')

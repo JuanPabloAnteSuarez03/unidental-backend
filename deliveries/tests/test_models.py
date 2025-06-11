@@ -71,10 +71,11 @@ def inventory_stock(product, origin_location):
 
 
 @pytest.fixture
-def sale(customer, product, inventory_stock):
+def sale(customer, product, inventory_stock, origin_location):
     """Fixture que crea una venta de muestra."""
     sale = Sale.objects.create(
         customer=customer,
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=True
     )
@@ -139,6 +140,7 @@ def test_delivery_ordering(sale, origin_location, dest_location):
     # Necesitamos crear otra venta para la segunda entrega
     sale2 = Sale.objects.create(
         customer=sale.customer,
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=True
     )
