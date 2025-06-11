@@ -73,10 +73,11 @@ def inventory_stock(product, origin_location):
 
 
 @pytest.fixture
-def sale(customer, product, inventory_stock):
+def sale(customer, product, inventory_stock, origin_location):
     """Fixture que crea una venta de muestra."""
     sale = Sale.objects.create(
         customer=customer,
+        location=origin_location,
         sale_type='normal',
         should_invoice=True
     )
@@ -331,6 +332,7 @@ def test_delivery_serializer_with_anonymous_sale(origin_location, dest_location,
     # Crear venta anónima
     sale = Sale.objects.create(
         customer=None,  # Sin cliente
+        location=origin_location,  # Agregar ubicación requerida
         sale_type='normal',
         should_invoice=False
     )

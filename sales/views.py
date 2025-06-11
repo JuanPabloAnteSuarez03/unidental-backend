@@ -3,6 +3,8 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from .models import Customer, Sale, SaleItem
 from .serializers import CustomerSerializer, SaleSerializer, SaleItemSerializer
 from django.db.models import Sum, Count, F
@@ -32,10 +34,11 @@ class CustomerViewSet(viewsets.ModelViewSet):
 class SaleViewSet(viewsets.ModelViewSet):
     """Vista para gestionar ventas."""
     
-    queryset = Sale.objects.all()
+    queryset = Sale.objects.select_related('customer', 'location').prefetch_related('items__product').all()
     serializer_class = SaleSerializer
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['sale_type', 'should_invoice', 'customer']
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['sale_type', 'should_invoice', 'customer', 'location']
+    search_fields = ['customer__name', 'location__name']
     ordering_fields = ['sale_date', 'total_gross', 'total_net']
 
     @action(detail=False)
@@ -78,6 +81,76 @@ class SaleViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(sales, many=True)
         return Response(serializer.data)
 
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Estadísticas de ventas por sede",
+        operation_description="Obtiene estadísticas de ventas agrupadas por sede/ubicación.",
+        manual_parameters=[
+            openapi.Parameter(
+                'days', openapi.IN_QUERY,
+                description="Número de días hacia atrás para calcular estadísticas",
+                type=openapi.TYPE_INTEGER,
+                default=30
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Estadísticas por sede obtenidas exitosamente",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'location__id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            'location__name': openapi.Schema(type=openapi.TYPE_STRING),
+                            'location__type': openapi.Schema(type=openapi.TYPE_STRING),
+                            'total_sales': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            'total_revenue': openapi.Schema(type=openapi.TYPE_NUMBER),
+                            'average_sale': openapi.Schema(type=openapi.TYPE_NUMBER),
+                        }
+                    )
+                )
+            )
+        }
+    )
+    @action(detail=False)
+    def by_location(self, request):
+        """
+        Retorna estadísticas de ventas agrupadas por sede.
+        
+        Parámetros de consulta:
+        - days: Número de días hacia atrás para calcular estadísticas (default: 30)
+        """
+        days = int(request.query_params.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+
+        # Estadísticas por sede
+        location_stats = Sale.objects.filter(
+            sale_date__gte=start_date
+        ).values(
+            'location__id',
+            'location__name',
+            'location__type'
+        ).annotate(
+            total_sales=Count('id'),
+            total_revenue=Sum('total_net'),
+            average_sale=Sum('total_net') / Count('id')
+        ).order_by('-total_revenue')
+
+        # Renombrar campos para que coincidan con los tests
+        formatted_stats = []
+        for stat in location_stats:
+            formatted_stats.append({
+                'location_id': stat['location__id'],
+                'location_name': stat['location__name'],
+                'location_type': stat['location__type'],
+                'total_sales': stat['total_sales'],
+                'total_revenue': stat['total_revenue'] or 0,
+                'average_sale': stat['average_sale'] or 0
+            })
+
+        return Response(formatted_stats)
+
 
 class SaleItemViewSet(viewsets.ModelViewSet):
     """Vista para gestionar items de venta."""
@@ -103,7 +176,7 @@ class SaleItemViewSet(viewsets.ModelViewSet):
         start_date = timezone.now() - timedelta(days=days)
 
         # Obtener productos más vendidos
-        top_products = SaleItem.objects.filter(
+        top_products_data = SaleItem.objects.filter(
             sale__sale_date__gte=start_date
         ).values(
             'product__name',
@@ -113,4 +186,14 @@ class SaleItemViewSet(viewsets.ModelViewSet):
             total_revenue=Sum(F('quantity') * F('unit_price'))
         ).order_by('-total_quantity')[:limit]
 
-        return Response(top_products)
+        # Reformatear datos para que coincidan con los tests
+        formatted_products = []
+        for product_data in top_products_data:
+            formatted_products.append({
+                'product': product_data['product__id'],
+                'product_name': product_data['product__name'],
+                'total_quantity': product_data['total_quantity'],
+                'total_revenue': product_data['total_revenue'] or 0
+            })
+
+        return Response(formatted_products)

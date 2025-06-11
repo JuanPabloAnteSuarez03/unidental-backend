@@ -16,9 +16,9 @@ class SaleItemInline(admin.TabularInline):
 
 @admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
-    list_display = ['id', 'customer', 'sale_date', 'sale_type', 'total_gross', 'total_net']
-    list_filter = ['sale_type', 'sale_date', 'should_invoice']
-    search_fields = ['customer__name']
+    list_display = ['id', 'customer', 'location', 'sale_date', 'sale_type', 'total_gross', 'total_net']
+    list_filter = ['sale_type', 'sale_date', 'should_invoice', 'location']
+    search_fields = ['customer__name', 'location__name']
     inlines = [SaleItemInline]
     date_hierarchy = 'sale_date'
 

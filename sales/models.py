@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from catalogs.models import Product
+from inventory.models import Location
 
 
 class Customer(models.Model):
@@ -37,6 +38,13 @@ class Sale(models.Model):
         related_name='sales',
         verbose_name="Cliente"
     )
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.PROTECT,
+        related_name='sales',
+        verbose_name="Sede de venta",
+        help_text="Sede donde se realizó la venta"
+    )
     sale_date = models.DateTimeField(
         auto_now_add=True, 
         verbose_name="Fecha de venta"
@@ -68,7 +76,7 @@ class Sale(models.Model):
 
     def __str__(self):
         customer_name = self.customer.name if self.customer else "Anónimo"
-        return f"Venta {self.id} - {customer_name} - {self.sale_date}"
+        return f"Venta {self.id} - {customer_name} - {self.location.name} - {self.sale_date}"
 
     def calculate_totals(self):
         """Calcula y actualiza los montos totales de la venta."""

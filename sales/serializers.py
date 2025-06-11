@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import Customer, Sale, SaleItem
 from catalogs.models import Product
 from catalogs.serializers import ProductSerializer
-from inventory.models import InventoryStock, InventoryMovement
+from inventory.models import InventoryStock, InventoryMovement, Location
+from inventory.serializers import LocationSerializer
 from django.db import models
 
 
@@ -30,18 +31,12 @@ class SaleItemSerializer(serializers.ModelSerializer):
         return obj.quantity * obj.unit_price
 
     def validate(self, data):
-        """Valida que haya suficiente stock disponible del producto."""
-        product = data['product']
+        """Validaciones básicas del item de venta."""
         quantity = data['quantity']
         
-        # Obtener el stock total disponible del producto en todas las ubicaciones
-        total_stock = InventoryStock.objects.filter(product=product).aggregate(
-            total=models.Sum('quantity')
-        )['total'] or 0
-        
-        if total_stock < quantity:
+        if quantity <= 0:
             raise serializers.ValidationError({
-                'quantity': f'Stock insuficiente. Disponible: {total_stock}'
+                'quantity': 'La cantidad debe ser mayor a cero'
             })
         
         return data
@@ -52,42 +47,55 @@ class SaleSerializer(serializers.ModelSerializer):
     
     items = SaleItemSerializer(many=True)
     customer_details = CustomerSerializer(source='customer', read_only=True)
+    location_details = LocationSerializer(source='location', read_only=True)
 
     class Meta:
         model = Sale
         fields = [
-            'id', 'customer', 'customer_details', 'sale_date', 'sale_type',
-            'should_invoice', 'total_gross', 'total_net', 'items'
+            'id', 'customer', 'customer_details', 'location', 'location_details',
+            'sale_date', 'sale_type', 'should_invoice', 'total_gross', 'total_net', 'items'
         ]
         read_only_fields = ['sale_date', 'total_gross', 'total_net']
 
     def create(self, validated_data):
         """
         Crea una venta con sus items asociados.
-        Actualiza automáticamente el stock de los productos.
+        Actualiza automáticamente el stock de los productos usando la sede especificada.
         """
         items_data = validated_data.pop('items')
         sale = Sale.objects.create(**validated_data)
+        sale_location = sale.location
 
         for item_data in items_data:
             product = item_data['product']
             quantity = item_data['quantity']
             
-            # Crear movimiento de salida en inventario
-            # Por simplicidad, usamos la primera ubicación con stock disponible
-            stock_location = InventoryStock.objects.filter(
-                product=product, 
-                quantity__gte=quantity
-            ).first()
-            
-            if stock_location:
+            # Verificar stock en la sede de la venta
+            try:
+                stock_location = InventoryStock.objects.get(
+                    product=product, 
+                    location=sale_location
+                )
+                
+                if stock_location.quantity < quantity:
+                    raise serializers.ValidationError({
+                        'items': f'Stock insuficiente del producto {product.name} en {sale_location.name}. '
+                                f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                    })
+                
+                # Crear movimiento de salida en inventario
                 InventoryMovement.objects.create(
                     product=product,
-                    location=stock_location.location,
+                    location=sale_location,
                     movement_type='out',
                     quantity=quantity,
                     notes=f'Venta #{sale.id}'
                 )
+                
+            except InventoryStock.DoesNotExist:
+                raise serializers.ValidationError({
+                    'items': f'No hay stock del producto {product.name} en {sale_location.name}'
+                })
             
             SaleItem.objects.create(sale=sale, **item_data)
 
