@@ -7,12 +7,14 @@ relacionados con la gestión de ventas, clientes y detalles de venta.
 
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
-from .views import CustomerViewSet, SaleViewSet, SaleItemViewSet
+from .views import CustomerViewSet, SaleViewSet, SaleItemViewSet, ReturnViewSet, ReturnItemViewSet
 
 router = DefaultRouter()
 router.register(r'customers', CustomerViewSet)
 router.register(r'sales', SaleViewSet)
 router.register(r'sale-items', SaleItemViewSet)
+router.register(r'returns', ReturnViewSet)
+router.register(r'return-items', ReturnItemViewSet)
 
 app_name = 'sales'
 
