@@ -5,11 +5,13 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from .models import Customer, Sale, SaleItem
-from .serializers import CustomerSerializer, SaleSerializer, SaleItemSerializer
+from .models import Customer, Sale, SaleItem, Return, ReturnItem
+from inventory.models import InventoryMovement
+from .serializers import CustomerSerializer, SaleSerializer, SaleItemSerializer, ReturnSerializer, ReturnItemSerializer
 from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
+from rest_framework.permissions import IsAuthenticated
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -194,6 +196,183 @@ class SaleItemViewSet(viewsets.ModelViewSet):
                 'product_name': product_data['product__name'],
                 'total_quantity': product_data['total_quantity'],
                 'total_revenue': product_data['total_revenue'] or 0
+            })
+
+        return Response(formatted_products)
+
+
+class ReturnViewSet(viewsets.ModelViewSet):
+    """Vista para gestionar devoluciones."""
+    
+    queryset = Return.objects.select_related('customer', 'location', 'original_sale').prefetch_related('items__product').all()
+    serializer_class = ReturnSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['reason', 'original_sale', 'customer', 'location']
+    search_fields = ['customer__name', 'original_sale__id', 'notes']
+    ordering_fields = ['return_date', 'total_amount']
+    ordering = ['-return_date']
+
+    @swagger_auto_schema(
+        operation_summary="Crear una nueva devolución",
+        operation_description="Crea una nueva devolución con sus items. Actualiza automáticamente el inventario.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['original_sale', 'location', 'reason', 'items'],
+            properties={
+                'original_sale': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la venta original"),
+                'customer': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del cliente (opcional, se toma de la venta)"),
+                'location': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la ubicación donde se procesa la devolución"),
+                'reason': openapi.Schema(type=openapi.TYPE_STRING, description="Motivo de la devolución", enum=['defective', 'wrong_item', 'customer_change', 'damaged', 'expired', 'other']),
+                'notes': openapi.Schema(type=openapi.TYPE_STRING, description="Notas adicionales (opcional)"),
+                'items': openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'sale_item': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del item de venta original"),
+                            'product': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del producto"),
+                            'quantity_returned': openapi.Schema(type=openapi.TYPE_INTEGER, description="Cantidad a devolver"),
+                            'unit_price': openapi.Schema(type=openapi.TYPE_NUMBER, description="Precio unitario")
+                        }
+                    )
+                )
+            }
+        ),
+        responses={201: ReturnSerializer(), 400: "Bad Request"}
+    )
+    def create(self, request, *args, **kwargs):
+        """Crea una nueva devolución."""
+        return super().create(request, *args, **kwargs)
+
+    @action(detail=False)
+    def statistics(self, request):
+        """
+        Retorna estadísticas de devoluciones para un período específico.
+        
+        Parámetros de consulta:
+        - days: Número de días hacia atrás para calcular estadísticas (default: 30)
+        """
+        days = int(request.query_params.get('days', 30))
+        start_date = timezone.now() - timedelta(days=days)
+
+        # Filtrar devoluciones dentro del rango de fechas
+        returns = Return.objects.filter(return_date__gte=start_date)
+
+        # Calcular estadísticas
+        stats = {
+            'total_returns': returns.count(),
+            'total_amount_returned': returns.aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
+            'returns_by_reason': returns.values('reason').annotate(
+                count=Count('id'),
+                amount=Sum('total_amount')
+            ),
+            'average_return_value': (
+                returns.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+            ) / (returns.count() or 1)
+        }
+
+        return Response(stats)
+
+    @action(detail=False)
+    def today(self, request):
+        """Retorna todas las devoluciones realizadas en el día actual."""
+        today = timezone.now().date()
+        returns = Return.objects.filter(
+            return_date__date=today
+        ).order_by('-return_date')
+        serializer = self.get_serializer(returns, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Estadísticas de devoluciones por sede",
+        operation_description="Obtiene estadísticas de devoluciones agrupadas por sede/ubicación.",
+        manual_parameters=[
+            openapi.Parameter(
+                'days', openapi.IN_QUERY,
+                description="Número de días hacia atrás para calcular estadísticas",
+                type=openapi.TYPE_INTEGER,
+                default=30
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Estadísticas por sede obtenidas exitosamente",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            'location_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            'location_name': openapi.Schema(type=openapi.TYPE_STRING),
+                            'location_type': openapi.Schema(type=openapi.TYPE_STRING),
+                            'total_returns': openapi.Schema(type=openapi.TYPE_INTEGER),
+                            'total_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+                            'average_return': openapi.Schema(type=openapi.TYPE_NUMBER),
+                        }
+                    )
+                )
+            )
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def by_location(self, request):
+        """Devuelve estadísticas de devoluciones agrupadas por ubicación."""
+        stats = Return.objects.values(
+            'location__name'
+        ).annotate(
+            total_returns=Count('id'),
+            total_returned_amount=Sum('items__subtotal')
+        ).order_by('-total_returned_amount')
+        
+        return Response(stats)
+
+
+class ReturnItemViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar los items de una devolución.
+    Permite ver, crear, editar y eliminar items de devolución.
+    """
+    queryset = ReturnItem.objects.select_related(
+        'return_obj', 'sale_item', 'product'
+    ).all()
+    serializer_class = ReturnItemSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['return_obj', 'product']
+
+    @action(detail=False, methods=['get'])
+    def top_returned_products(self, request):
+        """
+        Devuelve un ranking de los productos más devueltos.
+        
+        Parámetros de consulta:
+        - days: Número de días hacia atrás para calcular estadísticas (default: 30)
+        - limit: Número máximo de productos a retornar (default: 10)
+        """
+        days = int(request.query_params.get('days', 30))
+        limit = int(request.query_params.get('limit', 10))
+        start_date = timezone.now() - timedelta(days=days)
+
+        # Obtener productos más devueltos
+        top_returned = ReturnItem.objects.filter(
+            return_obj__return_date__gte=start_date
+        ).values(
+            'product__name',
+            'product__id'
+        ).annotate(
+            total_quantity_returned=Sum('quantity_returned'),
+            total_amount_returned=Sum(F('quantity_returned') * F('unit_price'))
+        ).order_by('-total_quantity_returned')[:limit]
+
+        # Formatear datos
+        formatted_products = []
+        for product_data in top_returned:
+            formatted_products.append({
+                'product': product_data['product__id'],
+                'product_name': product_data['product__name'],
+                'total_quantity_returned': product_data['total_quantity_returned'],
+                'total_amount_returned': product_data['total_amount_returned'] or 0
             })
 
         return Response(formatted_products)

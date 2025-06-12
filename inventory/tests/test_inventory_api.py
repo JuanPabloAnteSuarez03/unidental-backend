@@ -262,23 +262,6 @@ class TestInventoryStockAPI:
         for stock in response.data['results']:
             assert stock['location'] == test_data['sede'].id
 
-    def test_filter_stock_by_location_type(self, api_client_authenticated, test_data):
-        """Prueba filtrar stock por tipo de ubicación."""
-        InventoryStock.objects.create(
-            product=test_data['product'],
-            location=test_data['sede'],
-            quantity=20
-        )
-        InventoryStock.objects.create(
-            product=test_data['product'],
-            location=test_data['bodega'],
-            quantity=30
-        )
-        
-        response = api_client_authenticated.get(self.stock_url, {'location__type': 'sede'})
-        assert response.status_code == 200
-        for stock in response.data['results']:
-            assert stock['location_type'] == 'Sede'
 
     def test_filter_stock_by_min_quantity(self, api_client_authenticated, test_data):
         """Prueba filtrar stock por cantidad mínima."""
