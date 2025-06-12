@@ -1,7 +1,10 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 from catalogs.models import Product
-from inventory.models import Location
+from inventory.models import Location, InventoryMovement
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 
 class Customer(models.Model):
@@ -129,3 +132,192 @@ class SaleItem(models.Model):
         verbose_name = "Detalle de venta"
         verbose_name_plural = "Detalles de venta"
         ordering = ['id']
+
+
+class Return(models.Model):
+    """Modelo para gestionar las devoluciones de ventas."""
+    
+    REASON_CHOICES = [
+        ('defective', 'Producto defectuoso'),
+        ('wrong_item', 'Producto incorrecto'),
+        ('customer_change', 'Cambio de opinión del cliente'),
+        ('damaged', 'Producto dañado'),
+        ('expired', 'Producto vencido'),
+        ('other', 'Otro'),
+    ]
+    
+    original_sale = models.ForeignKey(
+        Sale,
+        on_delete=models.PROTECT,
+        related_name='returns',
+        verbose_name="Venta original"
+    )
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='returns',
+        verbose_name="Cliente"
+    )
+    location = models.ForeignKey(
+        Location,
+        on_delete=models.PROTECT,
+        related_name='returns',
+        verbose_name="Sede de devolución"
+    )
+    return_date = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de devolución"
+    )
+    reason = models.CharField(
+        max_length=20,
+        choices=REASON_CHOICES,
+        verbose_name="Motivo de devolución"
+    )
+    notes = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Notas adicionales"
+    )
+    total_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name="Monto total devuelto"
+    )
+
+    def __str__(self):
+        customer_name = self.customer.name if self.customer else "Anónimo"
+        return f"Devolución {self.id} - {customer_name} - {self.location.name} - {self.return_date}"
+
+    def calculate_total(self):
+        """Calcula y actualiza el monto total de la devolución."""
+        items = self.items.all()
+        self.total_amount = sum(item.quantity_returned * item.unit_price for item in items)
+        self.save()
+
+    class Meta:
+        verbose_name = "Devolución"
+        verbose_name_plural = "Devoluciones"
+        ordering = ['-return_date']
+
+
+class ReturnItem(models.Model):
+    """Modelo para gestionar los items individuales de cada devolución."""
+    
+    return_obj = models.ForeignKey(
+        Return,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name="Devolución"
+    )
+    sale_item = models.ForeignKey(
+        SaleItem,
+        on_delete=models.PROTECT,
+        related_name='return_items',
+        verbose_name="Item de venta original"
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name='return_items',
+        verbose_name="Producto"
+    )
+    quantity_returned = models.IntegerField(
+        validators=[MinValueValidator(1)],
+        verbose_name="Cantidad devuelta"
+    )
+    unit_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        verbose_name="Precio unitario"
+    )
+    subtotal = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name="Subtotal"
+    )
+
+    def __str__(self):
+        return f"{self.quantity_returned} x {self.product.name} devuelto de Venta {self.sale_item.sale.id}"
+
+    def save(self, *args, **kwargs):
+        """Calcula el subtotal y actualiza el total de la devolución al guardar."""
+        self.subtotal = self.quantity_returned * self.unit_price
+        super().save(*args, **kwargs)
+        self.return_obj.calculate_total()
+
+    def clean(self):
+        """Validaciones personalizadas."""
+        super().clean()
+        
+        # Validar que el producto corresponde al item de venta
+        if self.product != self.sale_item.product:
+            raise ValidationError({
+                'product': 'El producto debe corresponder al item de venta original.'
+            })
+        
+        # Validar que no se devuelva más cantidad de la vendida
+        # Obtener cantidad ya devuelta para este sale_item
+        already_returned = ReturnItem.objects.filter(
+            sale_item=self.sale_item
+        ).exclude(id=self.id).aggregate(
+            total=models.Sum('quantity_returned')
+        )['total'] or 0
+        
+        available_to_return = self.sale_item.quantity - already_returned
+        
+        if self.quantity_returned > available_to_return:
+            raise ValidationError({
+                'quantity_returned': f'No se puede devolver más cantidad de la disponible. '
+                                   f'Disponible para devolver: {available_to_return}'
+            })
+
+    class Meta:
+        verbose_name = "Item de devolución"
+        verbose_name_plural = "Items de devolución"
+        ordering = ['id']
+
+
+# Señal para actualizar el total de la devolución cuando se guarda/elimina un item
+@receiver([post_save, post_delete], sender=ReturnItem)
+def update_return_total(sender, instance, **kwargs):
+    """Actualiza el `total_amount` de la devolución padre."""
+    if instance.return_obj:
+        instance.return_obj.calculate_total()
+
+
+# Señales para actualizar el inventario cuando se gestiona un ReturnItem
+@receiver(post_save, sender=ReturnItem)
+def update_inventory_on_return_item_save(sender, instance, created, **kwargs):
+    """
+    Actualiza el inventario cuando se crea o actualiza un item de devolución.
+    - Si se crea, añade el stock de vuelta.
+    - Si se actualiza, la lógica se maneja en el serializador para comparar la cantidad vieja y nueva.
+    """
+    if created:
+        InventoryMovement.objects.create(
+            product=instance.product,
+            location=instance.return_obj.location,
+            movement_type='in',
+            quantity=instance.quantity_returned,
+            notes=f'Devolución por item #{instance.id}'
+        )
+
+@receiver(post_delete, sender=ReturnItem)
+def update_inventory_on_return_item_delete(sender, instance, **kwargs):
+    """
+    Revierte el stock cuando se elimina un item de devolución.
+    """
+    InventoryMovement.objects.create(
+        product=instance.product,
+        location=instance.return_obj.location,
+        movement_type='out',
+        quantity=instance.quantity_returned,
+        notes=f'Reversión por eliminación de item de devolución #{instance.id}'
+    )
