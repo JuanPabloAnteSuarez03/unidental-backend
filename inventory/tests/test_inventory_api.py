@@ -839,7 +839,7 @@ class TestInventoryMovementAPI:
             quantity=20
         )
         
-        alerts_url = reverse('inventorystock-expiring-stock')
+        alerts_url = '/api/v1/inventory/stock/expiring_stock/'
         response = api_client_authenticated.get(alerts_url)
         assert response.status_code == 200, f"Error: {response.data}"
         
@@ -874,7 +874,7 @@ class TestInventoryMovementAPI:
             quantity=25
         )
         
-        alerts_url = reverse('inventorystock-expiring-stock')
+        alerts_url = '/api/v1/inventory/stock/expiring_stock/'
         response = api_client_authenticated.get(alerts_url, {'days_ahead': 60})
         assert response.status_code == 200
         
@@ -925,7 +925,7 @@ class TestInventoryMovementAPI:
             quantity=40
         )
         
-        alerts_url = reverse('inventorystock-expiring-stock')
+        alerts_url = '/api/v1/inventory/stock/expiring_stock/'
         response = api_client_authenticated.get(alerts_url, {'location': test_data['sede'].id})
         assert response.status_code == 200
         
