@@ -14,7 +14,8 @@ from drf_yasg import openapi
 from .models import Location, InventoryStock, InventoryMovement
 from .serializers import (
     LocationSerializer, InventoryStockSerializer, InventoryMovementSerializer,
-    StockAlertSerializer, ExpiryAlertSerializer, StockSummarySerializer
+    StockAlertSerializer, ExpiryAlertSerializer, StockSummarySerializer,
+    CompositeBreakdownSerializer
 )
 from .filters import LocationFilter, InventoryStockFilter, InventoryMovementFilter
 from catalogs.models import Product
@@ -311,39 +312,168 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'])
     def expiry_alerts(self, request):
-        """Endpoint para obtener alertas de productos próximos a vencer."""
-        
+        """
+        Obtiene alertas de productos próximos a vencer.
+        """
         days_ahead = int(request.query_params.get('days_ahead', 30))
+        location = request.query_params.get('location')
+        
+        from datetime import date, timedelta
+        from django.utils import timezone
+        
+        expiry_threshold = timezone.now().date() + timedelta(days=days_ahead)
+        
+        # Obtener lotes próximos a vencer con stock disponible
+        expiring_stock = InventoryStock.objects.filter(
+            batch__expiry_date__lte=expiry_threshold,
+            batch__expiry_date__gte=timezone.now().date(),
+            quantity__gt=0
+        ).select_related('product', 'location', 'batch')
+        
+        if location:
+            expiring_stock = expiring_stock.filter(location_id=location)
+        
+        alerts = []
+        for stock in expiring_stock:
+            alerts.append({
+                'product_id': stock.product.id,
+                'product_name': stock.product.name,
+                'product_sku': stock.product.sku,
+                'location_id': stock.location.id,
+                'location_name': stock.location.name,
+                'batch_id': stock.batch.id,
+                'batch_number': stock.batch.batch_number,
+                'expiry_date': stock.batch.expiry_date,
+                'days_to_expiry': stock.batch.days_to_expiry,
+                'quantity': stock.quantity
+            })
+        
+        serializer = ExpiryAlertSerializer(alerts, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='post',
+        operation_description="Desarmar un producto compuesto en sus componentes",
+        request_body=CompositeBreakdownSerializer,
+        responses={200: "Desarmado exitoso", 400: "Error en la operación"}
+    )
+    @action(detail=False, methods=['post'])
+    def breakdown_composite(self, request):
+        """
+        Desarma un producto compuesto en sus componentes individuales.
+        
+        Esto permite convertir cajas en unidades individuales, por ejemplo:
+        1 caja de 10 blisters -> 10 blisters individuales
+        """
+        serializer = CompositeBreakdownSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        try:
+            composite_product = Product.objects.get(id=serializer.validated_data['composite_product'])
+            location = Location.objects.get(id=serializer.validated_data['location'])
+            quantity = serializer.validated_data['quantity']
+            notes = serializer.validated_data.get('notes', '')
+            
+            # Crear el movimiento de desarmado
+            movement = InventoryMovement.create_composite_breakdown(
+                composite_product=composite_product,
+                location=location,
+                quantity=quantity,
+                user=request.user,
+                notes=notes
+            )
+            
+            return Response({
+                'message': f'Se desarmaron {quantity} unidades de {composite_product.name}',
+                'movement_id': movement.id,
+                'components_affected': [
+                    {
+                        'product': comp.component_product.name,
+                        'quantity_added': quantity * comp.quantity
+                    }
+                    for comp in composite_product.get_components()
+                ]
+            })
+            
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Producto compuesto no encontrado'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Location.DoesNotExist:
+            return Response(
+                {'error': 'Ubicación no encontrada'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Obtener stock de productos próximos a vencer por ubicación",
+        manual_parameters=[
+            openapi.Parameter('days_ahead', openapi.IN_QUERY, description="Días hacia adelante para alertas (default: 30)", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location', openapi.IN_QUERY, description="Filtrar por ubicación", type=openapi.TYPE_INTEGER),
+        ],
+        responses={200: InventoryStockSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def expiring_stock(self, request):
+        """
+        Obtiene el stock de productos que están próximos a vencer.
+        Útil para generar reportes de productos a sacar a la venta.
+        """
+        days_ahead = int(request.query_params.get('days_ahead', 30))
+        location = request.query_params.get('location')
+        
+        from datetime import date, timedelta
+        from django.utils import timezone
+        
+        expiry_threshold = timezone.now().date() + timedelta(days=days_ahead)
+        
+        # Obtener stock con lotes próximos a vencer
+        queryset = self.get_queryset().filter(
+            batch__expiry_date__lte=expiry_threshold,
+            batch__expiry_date__gte=timezone.now().date(),
+            quantity__gt=0
+        ).order_by('batch__expiry_date')
+        
+        if location:
+            queryset = queryset.filter(location_id=location)
+        
+        serializer = InventoryStockSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_description="Obtener stock agrupado por lotes (FIFO)",
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de la ubicación", type=openapi.TYPE_INTEGER),
+        ],
+        responses={200: InventoryStockSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def by_batches(self, request):
+        """
+        Obtiene el stock organizado por lotes en orden FIFO.
+        Útil para saber qué lotes usar primero en ventas.
+        """
+        product_id = request.query_params.get('product')
         location_id = request.query_params.get('location')
         
-        alert_date = timezone.now().date() + timedelta(days=days_ahead)
+        queryset = self.get_queryset().filter(
+            batch__isnull=False,
+            quantity__gt=0
+        ).order_by('batch__expiry_date')
         
-        queryset = InventoryMovement.objects.filter(
-            movement_type='in',
-            expiry_date__isnull=False,
-            expiry_date__lte=alert_date,
-            expiry_date__gte=timezone.now().date()
-        ).select_related('product', 'location')
-        
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
         if location_id:
             queryset = queryset.filter(location_id=location_id)
         
-        alerts = []
-        for movement in queryset:
-            days_to_expiry = (movement.expiry_date - timezone.now().date()).days
-            alerts.append({
-                'product_id': movement.product.id,
-                'product_name': movement.product.name,
-                'product_sku': movement.product.sku,
-                'location_id': movement.location.id,
-                'location_name': movement.location.name,
-                'expiry_date': movement.expiry_date,
-                'days_to_expiry': days_to_expiry,
-                'quantity': movement.quantity
-            })
-        
-        # Ordenar por días hasta vencimiento
-        alerts.sort(key=lambda x: x['days_to_expiry'])
-        
-        serializer = ExpiryAlertSerializer(alerts, many=True)
+        serializer = InventoryStockSerializer(queryset, many=True)
         return Response(serializer.data)

@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import Location, InventoryStock, InventoryMovement
-from catalogs.models import Product
+from catalogs.models import Product, ProductBatch
+from catalogs.serializers import ProductSummarySerializer, ProductBatchSerializer
 from django.contrib.auth.models import User
 
 
@@ -29,19 +30,32 @@ class LocationSerializer(serializers.ModelSerializer):
 
 
 class InventoryStockSerializer(serializers.ModelSerializer):
-    """Serializer para el modelo InventoryStock."""
+    """
+    Serializer para el modelo InventoryStock.
+    Actualizado para manejar lotes.
+    """
     
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     product_unit = serializers.CharField(source='product.unit', read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
-    location_type = serializers.CharField(source='location.get_type_display', read_only=True)
+    location_type = serializers.CharField(source='location.type', read_only=True)
+    
+    # Campos para lotes
+    batch_details = ProductBatchSerializer(source='batch', read_only=True)
+    batch_number = serializers.CharField(source='batch.batch_number', read_only=True)
+    expiry_date = serializers.DateField(source='batch.expiry_date', read_only=True)
+    days_to_expiry = serializers.ReadOnlyField(source='batch.days_to_expiry')
+    is_expired = serializers.ReadOnlyField(source='batch.is_expired')
     
     class Meta:
         model = InventoryStock
         fields = [
             'id', 'product', 'product_name', 'product_sku', 'product_unit',
-            'location', 'location_name', 'location_type', 'quantity', 'last_updated'
+            'location', 'location_name', 'location_type', 
+            'batch', 'batch_details', 'batch_number', 'expiry_date', 
+            'days_to_expiry', 'is_expired',
+            'quantity', 'last_updated'
         ]
         read_only_fields = ['id', 'last_updated']
 
@@ -51,24 +65,61 @@ class InventoryStockSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La cantidad no puede ser negativa.")
         return value
 
+    def validate(self, data):
+        """Validaciones del stock de inventario."""
+        product = data.get('product')
+        batch = data.get('batch')
+        
+        # Validar que si el producto requiere control de lotes, se especifique un lote
+        if product and product.requires_batch_control and not batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto requiere especificar un lote.'
+            })
+        
+        # Validar que si el producto no requiere control de lotes, no se especifique un lote
+        if product and not product.requires_batch_control and batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto no requiere control de lotes.'
+            })
+        
+        # Validar que el batch corresponde al producto
+        if batch and product and batch.product != product:
+            raise serializers.ValidationError({
+                'batch': 'El lote no corresponde al producto seleccionado.'
+            })
+        
+        return data
+
 
 class InventoryMovementSerializer(serializers.ModelSerializer):
-    """Serializer para el modelo InventoryMovement."""
+    """
+    Serializer para el modelo InventoryMovement.
+    Actualizado para manejar lotes y productos compuestos.
+    """
     
     product_name = serializers.CharField(source='product.name', read_only=True)
     product_sku = serializers.CharField(source='product.sku', read_only=True)
     location_name = serializers.CharField(source='location.name', read_only=True)
-    location_type = serializers.CharField(source='location.get_type_display', read_only=True)
+    location_type = serializers.CharField(source='location.type', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
     movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
+    
+    # Campos para lotes
+    batch_details = ProductBatchSerializer(source='batch', read_only=True)
+    batch_number = serializers.CharField(source='batch.batch_number', read_only=True)
+    
+    # Campos para productos compuestos
+    related_movement_id = serializers.IntegerField(source='related_composite_movement.id', read_only=True)
     
     class Meta:
         model = InventoryMovement
         fields = [
             'id', 'product', 'product_name', 'product_sku',
             'location', 'location_name', 'location_type',
+            'batch', 'batch_details', 'batch_number',
             'movement_type', 'movement_type_display', 'quantity',
-            'occurred_at', 'expiry_date', 'user', 'user_username', 'notes'
+            'occurred_at', 'user', 'user_username', 'notes',
+            'related_composite_movement', 'related_movement_id'
         ]
         read_only_fields = ['id', 'occurred_at']
 
@@ -80,9 +131,35 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
 
     def validate_movement_type(self, value):
         """Validar tipo de movimiento."""
-        if value not in ['in', 'out']:
+        if value not in ['in', 'out', 'composite_conversion']:
             raise serializers.ValidationError("Tipo de movimiento inválido.")
         return value
+
+    def validate(self, data):
+        """Validaciones del movimiento de inventario."""
+        product = data.get('product')
+        batch = data.get('batch')
+        movement_type = data.get('movement_type')
+        
+        # Validar que si el producto requiere control de lotes, se especifique un lote
+        if product and product.requires_batch_control and not batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto requiere especificar un lote.'
+            })
+        
+        # Validar que si el producto no requiere control de lotes, no se especifique un lote
+        if product and not product.requires_batch_control and batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto no requiere control de lotes.'
+            })
+        
+        # Validar que el batch corresponde al producto
+        if batch and product and batch.product != product:
+            raise serializers.ValidationError({
+                'batch': 'El lote no corresponde al producto seleccionado.'
+            })
+        
+        return data
     
     def create(self, validated_data):
         """Al crear un movimiento, asignar el usuario actual si no se especifica."""
@@ -122,6 +199,11 @@ class StockAlertSerializer(serializers.Serializer):
     location_name = serializers.CharField()
     current_quantity = serializers.IntegerField()
     alert_type = serializers.CharField()  # 'low_stock', 'out_of_stock'
+    
+    # Campos para lotes
+    batch_id = serializers.IntegerField(required=False, allow_null=True)
+    batch_number = serializers.CharField(required=False, allow_null=True)
+    expiry_date = serializers.DateField(required=False, allow_null=True)
 
 
 class ExpiryAlertSerializer(serializers.Serializer):
@@ -132,6 +214,8 @@ class ExpiryAlertSerializer(serializers.Serializer):
     product_sku = serializers.CharField()
     location_id = serializers.IntegerField()
     location_name = serializers.CharField()
+    batch_id = serializers.IntegerField()
+    batch_number = serializers.CharField()
     expiry_date = serializers.DateField()
     days_to_expiry = serializers.IntegerField()
     quantity = serializers.IntegerField()
@@ -145,7 +229,27 @@ class StockSummarySerializer(serializers.Serializer):
     product_sku = serializers.CharField()
     product_unit = serializers.CharField()
     total_quantity = serializers.IntegerField()
+    requires_batch_control = serializers.BooleanField()
     locations = serializers.ListField(
         child=serializers.DictField(), 
-        help_text="Lista de ubicaciones con sus cantidades"
-    ) 
+        help_text="Lista de ubicaciones con sus cantidades y lotes"
+    )
+
+
+class CompositeBreakdownSerializer(serializers.Serializer):
+    """Serializer para desarmar productos compuestos."""
+    
+    composite_product = serializers.IntegerField(help_text="ID del producto compuesto a desarmar")
+    location = serializers.IntegerField(help_text="ID de la ubicación donde realizar el desarmado")
+    quantity = serializers.IntegerField(min_value=1, help_text="Cantidad de unidades compuestas a desarmar")
+    notes = serializers.CharField(required=False, allow_blank=True, help_text="Notas adicionales")
+
+    def validate_composite_product(self, value):
+        """Validar que el producto sea compuesto."""
+        try:
+            product = Product.objects.get(id=value)
+            if not product.is_composite():
+                raise serializers.ValidationError("El producto debe ser de tipo compuesto/kit.")
+        except Product.DoesNotExist:
+            raise serializers.ValidationError("El producto no existe.")
+        return value 
