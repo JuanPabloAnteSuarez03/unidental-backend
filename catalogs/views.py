@@ -2,8 +2,11 @@ from django.shortcuts import render
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes as perm_decorator, action
 from rest_framework.response import Response
-from .models import Category, Product
-from .serializers import CategorySerializer, ProductSerializer
+from django.utils import timezone
+from django.db.models import Q, Count
+from datetime import timedelta
+from .models import Category, Product, ProductComponent, ProductBatch
+from .serializers import CategorySerializer, ProductSerializer, ProductComponentSerializer, ProductBatchSerializer
 from .filters import CategoryFilter, ProductFilter
 from .validators import SKUValidator
 from drf_yasg.utils import swagger_auto_schema
@@ -375,3 +378,201 @@ def validate_sku(request):
             'mensaje': str(e),
             'disponible': False
         })
+
+class ProductComponentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar componentes de productos compuestos.
+    
+    Permite crear, leer, actualizar y eliminar las relaciones entre 
+    productos compuestos (kits/cajas) y sus componentes individuales.
+    """
+    queryset = ProductComponent.objects.select_related(
+        'composite_product', 'component_product'
+    ).all()
+    serializer_class = ProductComponentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_summary="Crear una relación producto-componente",
+        operation_description="Establece que un producto compuesto contiene una cantidad específica de otro producto como componente.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['composite_product', 'component_product', 'quantity'],
+            properties={
+                'composite_product': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del producto compuesto (kit/caja)"),
+                'component_product': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del producto componente (individual)"),
+                'quantity': openapi.Schema(type=openapi.TYPE_INTEGER, description="Cantidad del componente en una unidad del compuesto", minimum=1)
+            },
+            example={
+                "composite_product": 1,
+                "component_product": 2,
+                "quantity": 10
+            }
+        ),
+        responses={201: ProductComponentSerializer(), 400: "Bad Request"}
+    )
+    def create(self, request, *args, **kwargs):
+        """Crea una nueva relación producto-componente."""
+        return super().create(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def by_composite(self, request):
+        """
+        Obtiene todos los componentes de un producto compuesto específico.
+        
+        Parámetros:
+        - composite_id: ID del producto compuesto
+        """
+        composite_id = request.query_params.get('composite_id')
+        if not composite_id:
+            return Response(
+                {'error': 'Se requiere el parámetro composite_id'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        components = self.queryset.filter(composite_product_id=composite_id)
+        serializer = self.get_serializer(components, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def by_component(self, request):
+        """
+        Obtiene todos los productos compuestos que contienen un componente específico.
+        
+        Parámetros:
+        - component_id: ID del producto componente
+        """
+        component_id = request.query_params.get('component_id')
+        if not component_id:
+            return Response(
+                {'error': 'Se requiere el parámetro component_id'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        composites = self.queryset.filter(component_product_id=component_id)
+        serializer = self.get_serializer(composites, many=True)
+        return Response(serializer.data)
+
+
+class ProductBatchViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar lotes de productos.
+    
+    Permite crear, leer, actualizar y eliminar lotes de productos
+    que requieren control de fechas de vencimiento.
+    """
+    queryset = ProductBatch.objects.select_related('product').all()
+    serializer_class = ProductBatchSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Filtrar lotes por parámetros de consulta."""
+        queryset = super().get_queryset()
+        
+        # Filtrar por producto
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        
+        # Filtrar por estado de expiración
+        expired = self.request.query_params.get('expired')
+        if expired is not None:
+            if expired.lower() == 'true':
+                queryset = queryset.filter(expiry_date__lt=timezone.now().date())
+            elif expired.lower() == 'false':
+                queryset = queryset.filter(expiry_date__gte=timezone.now().date())
+        
+        return queryset
+
+    @swagger_auto_schema(
+        operation_summary="Crear un nuevo lote",
+        operation_description="Crea un nuevo lote para un producto que requiere control de lotes.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['product', 'batch_number', 'expiry_date'],
+            properties={
+                'product': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del producto"),
+                'batch_number': openapi.Schema(type=openapi.TYPE_STRING, description="Número de lote del fabricante"),
+                'manufacturing_date': openapi.Schema(type=openapi.TYPE_STRING, format='date', description="Fecha de fabricación (opcional)"),
+                'expiry_date': openapi.Schema(type=openapi.TYPE_STRING, format='date', description="Fecha de vencimiento"),
+                'supplier_reference': openapi.Schema(type=openapi.TYPE_STRING, description="Referencia del proveedor (opcional)"),
+                'notes': openapi.Schema(type=openapi.TYPE_STRING, description="Notas adicionales (opcional)")
+            },
+            example={
+                "product": 1,
+                "batch_number": "LOT2024001",
+                "manufacturing_date": "2024-01-15",
+                "expiry_date": "2026-01-15",
+                "supplier_reference": "PROV-REF-001",
+                "notes": "Lote en condiciones óptimas"
+            }
+        ),
+        responses={201: ProductBatchSerializer(), 400: "Bad Request"}
+    )
+    def create(self, request, *args, **kwargs):
+        """Crea un nuevo lote de producto."""
+        return super().create(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener lotes próximos a vencer",
+        operation_description="Retorna lotes que vencen en los próximos días especificados.",
+        manual_parameters=[
+            openapi.Parameter('days', openapi.IN_QUERY, description="Días hacia adelante para alertas (default: 30)", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product', openapi.IN_QUERY, description="Filtrar por producto específico", type=openapi.TYPE_INTEGER),
+        ],
+        responses={200: ProductBatchSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def expiring_soon(self, request):
+        """
+        Obtiene los lotes que están próximos a vencer.
+        
+        Parámetros:
+        - days: Número de días hacia adelante (default: 30)
+        - product: ID del producto para filtrar (opcional)
+        """
+        days_ahead = int(request.query_params.get('days', 30))
+        product_id = request.query_params.get('product')
+        
+        expiry_threshold = timezone.now().date() + timedelta(days=days_ahead)
+        
+        queryset = self.get_queryset().filter(
+            expiry_date__lte=expiry_threshold,
+            expiry_date__gte=timezone.now().date()
+        ).order_by('expiry_date')
+        
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener lotes expirados",
+        operation_description="Retorna todos los lotes que ya han expirado.",
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="Filtrar por producto específico", type=openapi.TYPE_INTEGER),
+        ],
+        responses={200: ProductBatchSerializer(many=True)}
+    )
+    @action(detail=False, methods=['get'])
+    def expired(self, request):
+        """
+        Obtiene todos los lotes que ya han expirado.
+        
+        Parámetros:
+        - product: ID del producto para filtrar (opcional)
+        """
+        product_id = request.query_params.get('product')
+        
+        queryset = self.get_queryset().filter(
+            expiry_date__lt=timezone.now().date()
+        ).order_by('-expiry_date')
+        
+        if product_id:
+            queryset = queryset.filter(product_id=product_id)
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
