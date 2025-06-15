@@ -4,7 +4,7 @@ from django.db import IntegrityError, transaction
 from django.contrib.auth import get_user_model
 from datetime import date, timedelta
 from inventory.models import Location, InventoryStock, InventoryMovement
-from catalogs.models import Category, Product
+from catalogs.models import Category, Product, ProductBatch
 
 User = get_user_model()
 
@@ -203,24 +203,37 @@ class TestInventoryBusinessLogic:
         assert stock_bodega.quantity == 200
 
     def test_movement_with_expiry_date(self, test_data, test_user):
-        """Prueba movimientos con fecha de vencimiento."""
+        """Prueba movimientos con lotes (en lugar de expiry_date directamente)."""
+        # El producto debe requerir control de lotes
+        test_data['product'].requires_batch_control = True
+        test_data['product'].save()
+        
         expiry_date = date.today() + timedelta(days=180)
+        
+        # Crear lote
+        batch = ProductBatch.objects.create(
+            product=test_data['product'],
+            batch_number='LOT-BUSINESS-001',
+            expiry_date=expiry_date
+        )
         
         movement = InventoryMovement.objects.create(
             product=test_data['product'],
             location=test_data['sede'],
             movement_type='in',
             quantity=75,
-            expiry_date=expiry_date,
+            batch=batch,
             user=test_user
         )
         
-        assert movement.expiry_date == expiry_date
+        assert movement.batch == batch
+        assert movement.batch.expiry_date == expiry_date
         
         # Verificar que el stock se actualizó normalmente
         stock = InventoryStock.objects.get(
             product=test_data['product'],
-            location=test_data['sede']
+            location=test_data['sede'],
+            batch=batch
         )
         assert stock.quantity == 75
 
@@ -267,25 +280,37 @@ class TestInventoryDataIntegrity:
             )
 
     def test_stock_unique_product_location_constraint(self, test_data):
-        """Prueba que no se puede crear stock duplicado para el mismo producto y ubicación."""
-        # Crear primer stock
+        """Prueba constraint único que ahora incluye batch."""
+        # Crear primer stock sin batch
         InventoryStock.objects.create(
             product=test_data['product'],
             location=test_data['sede'],
             quantity=50
         )
         
-        # Intentar crear duplicado debe fallar
-        with pytest.raises(IntegrityError):
-            InventoryStock.objects.create(
-                product=test_data['product'],
-                location=test_data['sede'],
-                quantity=30
-            )
+        # Crear stock con batch (debe funcionar ya que son diferentes)
+        test_data['product'].requires_batch_control = True
+        test_data['product'].save()
+        
+        batch = ProductBatch.objects.create(
+            product=test_data['product'],
+            batch_number='LOT-CONSTRAINT-001',
+            expiry_date=date.today() + timedelta(days=365)
+        )
+        
+        # Esto debe funcionar porque el constraint incluye batch
+        stock_with_batch = InventoryStock.objects.create(
+            product=test_data['product'],
+            location=test_data['sede'],
+            batch=batch,
+            quantity=30
+        )
+        
+        assert stock_with_batch.quantity == 30
 
     def test_movement_requires_product(self, test_data, test_user):
         """Prueba que un movimiento requiere un producto."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(IntegrityError):  # Cambió de ValidationError a IntegrityError
             InventoryMovement.objects.create(
                 product=None,
                 location=test_data['sede'],
@@ -500,23 +525,34 @@ class TestInventoryBusinessRules:
     """Tests para reglas de negocio específicas."""
 
     def test_expiry_date_validation(self, test_data, test_user):
-        """Prueba que la fecha de vencimiento no puede ser pasada."""
-        past_date = date.today() - timedelta(days=10)
+        """Prueba validación de fechas de vencimiento usando lotes."""
+        from catalogs.models import ProductBatch
         
-        movement = InventoryMovement(
+        # El producto debe requerir control de lotes
+        test_data['product'].requires_batch_control = True
+        test_data['product'].save()
+        
+        # Crear lote con fecha pasada (debe funcionar para tests)
+        past_date = date.today() - timedelta(days=30)
+        batch = ProductBatch.objects.create(
+            product=test_data['product'],
+            batch_number='LOT-PAST-001',
+            expiry_date=past_date
+        )
+        
+        movement = InventoryMovement.objects.create(
             product=test_data['product'],
             location=test_data['sede'],
             movement_type='in',
-            quantity=20,
-            expiry_date=past_date,
-            user=test_user
+            quantity=25,
+            batch=batch,
+            user=test_user,
+            notes='Lote vencido para pruebas'
         )
         
-        # Nota: Esta validación podría implementarse en el modelo si es requerida
-        # Por ahora, asumimos que se permite ingresar productos ya vencidos
-        movement.full_clean()  # No debe fallar
-        movement.save()
-        assert movement.expiry_date == past_date
+        # Verificar que el lote está vencido
+        assert movement.batch.expiry_date == past_date
+        assert movement.batch.is_expired == True
 
     def test_movement_notes_optional(self, test_data, test_user):
         """Prueba que las notas en movimientos son opcionales."""

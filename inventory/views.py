@@ -98,7 +98,7 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
         
         # Agrupar por producto y sumar cantidades
         stock_data = InventoryStock.objects.select_related('product', 'location').values(
-            'product__id', 'product__name', 'product__sku', 'product__unit'
+            'product__id', 'product__name', 'product__sku', 'product__unit', 'product__requires_batch_control'
         ).annotate(
             total_quantity=Sum('quantity')
         ).filter(total_quantity__gt=0).order_by('product__name')
@@ -119,6 +119,7 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
                 'product_sku': item['product__sku'],
                 'product_unit': item['product__unit'],
                 'total_quantity': item['total_quantity'],
+                'requires_batch_control': item['product__requires_batch_control'],
                 'locations': list(locations_data)
             })
         
