@@ -36,6 +36,18 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS_STRING = config('ALLOWED_HOSTS', default='127.0.0.1,localhost')
 ALLOWED_HOSTS = [s.strip() for s in ALLOWED_HOSTS_STRING.split(',')]
 
+# Agregar dominios de Railway automáticamente si no está en DEBUG
+if not DEBUG:
+    # Permitir todos los subdominios de Railway
+    ALLOWED_HOSTS.extend([
+        '.railway.app',
+        '.up.railway.app', 
+        'unidental-backend-production.up.railway.app'
+    ])
+    # En desarrollo local también permitir
+    if '127.0.0.1' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.extend(['127.0.0.1', 'localhost'])
+
 # CSRF Configuration for HTTPS
 # Asegúrate de que la URL de tu sitio de producción esté aquí
 # Puedes leerla de una variable de entorno si cambia entre entornos
