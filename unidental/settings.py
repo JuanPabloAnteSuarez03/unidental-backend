@@ -301,7 +301,6 @@ if not DEBUG:
     DATABASES['default'].update({
         'CONN_MAX_AGE': config('CONN_MAX_AGE', default=600, cast=int),
         'OPTIONS': {
-            'MAX_CONNS': DATABASE_MAX_CONNECTIONS,
             'connect_timeout': 10,
         }
     })
