@@ -17,9 +17,6 @@
         "PYTHONUNBUFFERED": "1",
         "DEBUG": "False",
         "USE_SQLITE_FOR_TESTS": "False",
-        "CONN_MAX_AGE": "600",
-        "DATABASE_CONNECTION_POOL_SIZE": "3",
-        "DATABASE_MAX_CONNECTIONS": "6",
         "ALLOWED_HOSTS": "127.0.0.1,localhost,.railway.app,.up.railway.app"
       }
     }
