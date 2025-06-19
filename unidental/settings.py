@@ -142,18 +142,26 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 USE_SQLITE_FOR_TESTS = os.environ.get('USE_SQLITE_FOR_TESTS') == 'True'
 
 if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
+    # Configuración de base de datos para tests.
+    # Usa SQLite en memoria para velocidad y aislamiento.
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:', # Usar base de datos en memoria para tests, es más rápido y limpio.
+            'NAME': ':memory:',
         }
     }
 else:
-    # Esta configuración solo se aplica para entornos de desarrollo y producción, no para tests.
+    # Configuración de base de datos para desarrollo y producción (PostgreSQL).
+    # Lee la URL de la base de datos desde la variable de entorno DATABASE_URL.
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        raise ValueError("DATABASE_URL no está configurada en el entorno.")
+        
     DATABASES = {
-        'default': dj_database_url.config(
+        'default': dj_database_url.parse(
+            db_url,
             conn_max_age=600,
-            conn_health_checks=True,
+            conn_health_checks=True
         )
     }
 
