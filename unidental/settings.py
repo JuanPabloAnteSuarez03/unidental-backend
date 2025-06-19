@@ -136,15 +136,34 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-# La configuración para los tests ahora se gestiona en `unidental/test_settings.py`
-# y se activa a través de la configuración en `pytest.ini`.
-# Esta configuración es solo para desarrollo y producción.
-DATABASES = {
-    'default': dj_database_url.config(
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+
+# La variable de entorno 'USE_SQLITE_FOR_TESTS' se establece a 'True' en el workflow de GitHub Actions
+# para asegurar que los tests usen una base de datos SQLite efímera y no intenten conectar a PostgreSQL.
+USE_SQLITE_FOR_TESTS = os.environ.get('USE_SQLITE_FOR_TESTS') == 'True'
+
+if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
+    # Configuración de base de datos para tests.
+    # Usa SQLite en memoria para velocidad y aislamiento.
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+else:
+    # Configuración de base de datos para desarrollo y producción (PostgreSQL).
+    # Lee la URL de la base de datos desde la variable de entorno DATABASE_URL.
+    db_url = os.environ.get('DATABASE_URL')
+    if not db_url:
+        raise ValueError("DATABASE_URL no está configurada en el entorno.")
+        
+    DATABASES = {
+        'default': dj_database_url.parse(
+            db_url,
+            conn_max_age=600,
+            conn_health_checks=True
+        )
+    }
 
 
 # Password validation
@@ -288,6 +307,20 @@ CACHES = {
 # Configuración de sesiones optimizada
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_CACHE_ALIAS = 'default'
+
+# Optimizaciones de base de datos para Railway
+if not DEBUG:
+    # Configuraciones adicionales para producción
+    DATABASE_CONNECTION_POOL_SIZE = config('DATABASE_CONNECTION_POOL_SIZE', default=5, cast=int)
+    DATABASE_MAX_CONNECTIONS = config('DATABASE_MAX_CONNECTIONS', default=10, cast=int)
+    
+    # Actualizar configuración de base de datos para producción
+    DATABASES['default'].update({
+        'CONN_MAX_AGE': config('CONN_MAX_AGE', default=600, cast=int),
+        'OPTIONS': {
+            'connect_timeout': 10,
+        }
+    })
 
 # Configuración de archivos estáticos optimizada
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
