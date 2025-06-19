@@ -137,27 +137,41 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if 'test' in sys.argv or config('USE_SQLITE_FOR_TESTS', default=False, cast=bool):
+# Configuración simplificada para tests
+if 'test' in sys.argv:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db_test.sqlite3',
+            'NAME': ':memory:',
         }
     }
 else:
-    # Configuración de base de datos para producción/desarrollo
-    database_config = dj_database_url.config(
-        default=config('DATABASE_URL'),
-        conn_max_age=600,
-    )
+    # Para desarrollo/producción, usar configuración manual más segura
+    DATABASE_URL = config('DATABASE_URL', default='')
     
-    # Limpiar opciones no válidas para PostgreSQL
-    if 'connect_timeout' in database_config.get('OPTIONS', {}):
-        del database_config['OPTIONS']['connect_timeout']
+    if DATABASE_URL.startswith('postgres://'):
+        # Convertir postgres:// a postgresql:// para evitar warnings
+        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
     
     DATABASES = {
-        'default': database_config
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('DB_NAME', default='unidental'),
+            'USER': config('DB_USER', default='postgres'),
+            'PASSWORD': config('DB_PASSWORD', default=''),
+            'HOST': config('DB_HOST', default='localhost'),
+            'PORT': config('DB_PORT', default='5432'),
+            'OPTIONS': {
+                'sslmode': 'require' if not DEBUG else 'prefer',
+            },
+        }
     }
+    
+    # Si hay DATABASE_URL, usarlo para sobreescribir
+    if DATABASE_URL:
+        import dj_database_url
+        db_from_url = dj_database_url.parse(DATABASE_URL)
+        DATABASES['default'].update(db_from_url)
 
 
 # Password validation
