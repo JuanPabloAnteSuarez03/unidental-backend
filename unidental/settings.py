@@ -141,18 +141,23 @@ if 'test' in sys.argv or config('USE_SQLITE_FOR_TESTS', default=False, cast=bool
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db_test.sqlite3', # O ':memory:' para en memoria, pero un archivo puede ser más fácil para CI
+            'NAME': BASE_DIR / 'db_test.sqlite3',
         }
     }
 else:
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=config('DATABASE_URL'),
-            conn_max_age=600,
-            # Ajusta ssl_require según la configuración de tu Supabase si es necesario
-            # ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool) 
+    # Configuración de base de datos para producción/desarrollo
+    database_config = dj_database_url.config(
+        default=config('DATABASE_URL'),
+        conn_max_age=600,
     )
-}
+    
+    # Limpiar opciones no válidas para PostgreSQL
+    if 'connect_timeout' in database_config.get('OPTIONS', {}):
+        del database_config['OPTIONS']['connect_timeout']
+    
+    DATABASES = {
+        'default': database_config
+    }
 
 
 # Password validation
