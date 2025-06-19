@@ -136,8 +136,9 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-# La configuración de la base de datos para los tests ahora se gestiona en `pytest.ini`.
-# Esta configuración es para desarrollo y producción.
+# La configuración para los tests ahora se gestiona en `unidental/test_settings.py`
+# y se activa a través de la configuración en `pytest.ini`.
+# Esta configuración es solo para desarrollo y producción.
 DATABASES = {
     'default': dj_database_url.config(
         conn_max_age=600,
@@ -287,20 +288,6 @@ CACHES = {
 # Configuración de sesiones optimizada
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_CACHE_ALIAS = 'default'
-
-# Optimizaciones de base de datos para Railway
-if not DEBUG:
-    # Configuraciones adicionales para producción
-    DATABASE_CONNECTION_POOL_SIZE = config('DATABASE_CONNECTION_POOL_SIZE', default=5, cast=int)
-    DATABASE_MAX_CONNECTIONS = config('DATABASE_MAX_CONNECTIONS', default=10, cast=int)
-    
-    # Actualizar configuración de base de datos para producción
-    DATABASES['default'].update({
-        'CONN_MAX_AGE': config('CONN_MAX_AGE', default=600, cast=int),
-        'OPTIONS': {
-            'connect_timeout': 10,
-        }
-    })
 
 # Configuración de archivos estáticos optimizada
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
