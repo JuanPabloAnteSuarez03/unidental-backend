@@ -136,34 +136,14 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-# La variable de entorno 'USE_SQLITE_FOR_TESTS' se establece a 'True' en el workflow de GitHub Actions
-# para asegurar que los tests usen una base de datos SQLite efímera y no intenten conectar a PostgreSQL.
-USE_SQLITE_FOR_TESTS = os.environ.get('USE_SQLITE_FOR_TESTS') == 'True'
-
-if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
-    # Configuración de base de datos para tests.
-    # Usa SQLite en memoria para velocidad y aislamiento.
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
-        }
-    }
-else:
-    # Configuración de base de datos para desarrollo y producción (PostgreSQL).
-    # Lee la URL de la base de datos desde la variable de entorno DATABASE_URL.
-    db_url = os.environ.get('DATABASE_URL')
-    if not db_url:
-        raise ValueError("DATABASE_URL no está configurada en el entorno.")
-        
-    DATABASES = {
-        'default': dj_database_url.parse(
-            db_url,
-            conn_max_age=600,
-            conn_health_checks=True
-        )
-    }
+# La configuración de la base de datos para los tests ahora se gestiona en `pytest.ini`.
+# Esta configuración es para desarrollo y producción.
+DATABASES = {
+    'default': dj_database_url.config(
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
 
 
 # Password validation
