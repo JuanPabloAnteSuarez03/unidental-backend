@@ -5,14 +5,14 @@ from inventory.serializers import LocationSerializer
 
 
 class DeliveryListSerializer(serializers.ModelSerializer):
-    """Serializer para lista de entregas."""
+    """Serializer optimizado para lista de entregas."""
     
-    customer_name = serializers.ReadOnlyField()
-    sale_total = serializers.ReadOnlyField()
+    # OPTIMIZACIÓN: Usar 'source' para acceder a datos precargados y evitar N+1 queries
+    customer_name = serializers.CharField(source='sale.customer.name', read_only=True)
+    sale_total = serializers.DecimalField(source='sale.total_net', max_digits=10, decimal_places=2, read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    delivery_time = serializers.ReadOnlyField()
     
-    # Campos anidados básicos
+    # OPTIMIZACIÓN: Campos básicos que no requieren queries adicionales
     origin_location_name = serializers.CharField(source='origin_location.name', read_only=True)
     dest_location_name = serializers.CharField(source='dest_location.name', read_only=True)
     
@@ -20,10 +20,9 @@ class DeliveryListSerializer(serializers.ModelSerializer):
         model = Delivery
         fields = [
             'id', 'sale', 'customer_name', 'sale_total',
-            'origin_location', 'origin_location_name',
-            'dest_location', 'dest_location_name',
+            'origin_location_name', 'dest_location_name',
             'shipped_at', 'delivered_at', 'status', 'status_display',
-            'delivery_time', 'created_at', 'updated_at'
+            'created_at'
         ]
 
 

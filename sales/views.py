@@ -155,9 +155,13 @@ class SaleViewSet(viewsets.ModelViewSet):
 
 
 class SaleItemViewSet(viewsets.ModelViewSet):
-    """Vista para gestionar items de venta."""
+    """Vista para gestionar items de venta - OPTIMIZADO."""
     
-    queryset = SaleItem.objects.all()
+    # 🚀 OPTIMIZACIÓN: Solo relaciones esenciales para listados rápidos
+    queryset = SaleItem.objects.select_related(
+        'sale',
+        'product'
+    ).all()
     serializer_class = SaleItemSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['sale', 'product']
@@ -202,15 +206,27 @@ class SaleItemViewSet(viewsets.ModelViewSet):
 
 
 class ReturnViewSet(viewsets.ModelViewSet):
-    """Vista para gestionar devoluciones."""
+    """Vista para gestionar devoluciones - OPTIMIZADO."""
     
-    queryset = Return.objects.select_related('customer', 'location', 'original_sale').prefetch_related('items__product').all()
+    # 🚀 OPTIMIZACIÓN: Solo relaciones esenciales para el listado
+    queryset = Return.objects.select_related(
+        'customer', 
+        'location', 
+        'original_sale'
+    ).all()
     serializer_class = ReturnSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['reason', 'original_sale', 'customer', 'location']
     search_fields = ['customer__name', 'original_sale__id', 'notes']
     ordering_fields = ['return_date', 'total_amount']
     ordering = ['-return_date']
+
+    def get_serializer_class(self):
+        """Usar serializer liviano para listados, completo para detalles."""
+        if self.action == 'list':
+            from .serializers import ReturnSummarySerializer
+            return ReturnSummarySerializer
+        return self.serializer_class
 
     @swagger_auto_schema(
         operation_summary="Crear una nueva devolución",
@@ -330,16 +346,26 @@ class ReturnViewSet(viewsets.ModelViewSet):
 
 class ReturnItemViewSet(viewsets.ModelViewSet):
     """
-    API endpoint para gestionar los items de una devolución.
+    API endpoint para gestionar los items de una devolución - OPTIMIZADO.
     Permite ver, crear, editar y eliminar items de devolución.
     """
+    # 🚀 OPTIMIZACIÓN: Precargar todas las relaciones necesarias para evitar N+1
     queryset = ReturnItem.objects.select_related(
-        'return_obj', 'sale_item', 'product'
+        'return_obj',
+        'product__category',  # Precargar categoría del producto
+        'sale_item__sale'     # Precargar venta del item original
     ).all()
-    serializer_class = ReturnItemSerializer
+    
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['return_obj', 'product']
+
+    def get_serializer_class(self):
+        """Usar serializer liviano para listados."""
+        if self.action == 'list':
+            from .serializers import ReturnItemSummarySerializer
+            return ReturnItemSummarySerializer
+        return ReturnItemSerializer
 
     @action(detail=False, methods=['get'])
     def top_returned_products(self, request):

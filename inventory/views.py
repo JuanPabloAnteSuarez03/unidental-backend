@@ -94,34 +94,45 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
     )
     @action(detail=False, methods=['get'])
     def summary(self, request):
-        """Endpoint para obtener resumen de stock por producto."""
+        """Endpoint para obtener resumen de stock por producto - CORREGIDO PARA N+1."""
         
-        # Agrupar por producto y sumar cantidades
-        stock_data = InventoryStock.objects.select_related('product', 'location').values(
-            'product__id', 'product__name', 'product__sku', 'product__unit', 'product__requires_batch_control'
-        ).annotate(
-            total_quantity=Sum('quantity')
-        ).filter(total_quantity__gt=0).order_by('product__name')
+        # UNA SOLA QUERY: Obtener todos los stocks con cantidad > 0
+        all_stock = InventoryStock.objects.filter(
+            quantity__gt=0
+        ).select_related('product', 'location').values(
+            'product__id', 'product__name', 'product__sku', 'product__unit', 
+            'product__requires_batch_control', 'location__id', 'location__name', 
+            'location__type', 'quantity'
+        ).order_by('product__name', 'location__name')
         
-        result = []
-        for item in stock_data:
-            # Obtener ubicaciones con stock para este producto
-            locations_data = InventoryStock.objects.filter(
-                product_id=item['product__id'],
-                quantity__gt=0
-            ).select_related('location').values(
-                'location__id', 'location__name', 'location__type', 'quantity'
-            )
+        # Agrupar por producto en Python (más eficiente que N queries)
+        products_dict = {}
+        for stock in all_stock:
+            product_id = stock['product__id']
             
-            result.append({
-                'product_id': item['product__id'],
-                'product_name': item['product__name'],
-                'product_sku': item['product__sku'],
-                'product_unit': item['product__unit'],
-                'total_quantity': item['total_quantity'],
-                'requires_batch_control': item['product__requires_batch_control'],
-                'locations': list(locations_data)
+            if product_id not in products_dict:
+                products_dict[product_id] = {
+                    'product_id': product_id,
+                    'product_name': stock['product__name'],
+                    'product_sku': stock['product__sku'],
+                    'product_unit': stock['product__unit'],
+                    'requires_batch_control': stock['product__requires_batch_control'],
+                    'total_quantity': 0,
+                    'locations': []
+                }
+            
+            # Agregar ubicación y sumar cantidad
+            products_dict[product_id]['locations'].append({
+                'location__id': stock['location__id'],
+                'location__name': stock['location__name'],
+                'location__type': stock['location__type'],
+                'quantity': stock['quantity']
             })
+            products_dict[product_id]['total_quantity'] += stock['quantity']
+        
+        # Convertir a lista ordenada
+        result = list(products_dict.values())
+        result.sort(key=lambda x: x['product_name'])
         
         serializer = StockSummarySerializer(result, many=True)
         return Response(serializer.data)

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Customer, Sale, SaleItem, Return, ReturnItem
 from catalogs.models import Product
-from catalogs.serializers import ProductSerializer
+from catalogs.serializers import ProductSerializer, ProductSummarySerializer
 from inventory.models import InventoryStock, InventoryMovement, Location
 from inventory.serializers import LocationSerializer
 from django.db import models
@@ -242,4 +242,36 @@ class ReturnSerializer(serializers.ModelSerializer):
         """Valida que la devolución tenga al menos un item."""
         if not items:
             raise serializers.ValidationError("Se requiere al menos un item en la devolución.")
-        return items 
+        return items
+
+
+class ReturnItemSummarySerializer(serializers.ModelSerializer):
+    """Serializador liviano para listados de items de devolución - OPTIMIZADO."""
+    
+    product_details = ProductSummarySerializer(source='product', read_only=True)
+    return_id = serializers.IntegerField(source='return_obj.id', read_only=True)
+    sale_id = serializers.IntegerField(source='sale_item.sale.id', read_only=True)
+    
+    class Meta:
+        model = ReturnItem
+        fields = [
+            'id', 'return_id', 'sale_id', 'product_details', 
+            'quantity_returned', 'unit_price', 'subtotal'
+        ]
+        read_only_fields = ['subtotal']
+
+
+class ReturnSummarySerializer(serializers.ModelSerializer):
+    """Serializador liviano para listados de devoluciones - OPTIMIZADO."""
+    
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    location_name = serializers.CharField(source='location.name', read_only=True)
+    original_sale_id = serializers.IntegerField(source='original_sale.id', read_only=True)
+    reason_display = serializers.CharField(source='get_reason_display', read_only=True)
+    
+    class Meta:
+        model = Return
+        fields = [
+            'id', 'original_sale_id', 'customer_name', 'location_name', 
+            'return_date', 'reason', 'reason_display', 'total_amount'
+        ] 
