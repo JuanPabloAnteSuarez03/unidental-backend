@@ -149,14 +149,13 @@ if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
         }
     }
 else:
+    # Esta configuración solo se aplica para entornos de desarrollo y producción, no para tests.
     DATABASES = {
         'default': dj_database_url.config(
-            default=config('DATABASE_URL'),
             conn_max_age=600,
-            # Ajusta ssl_require según la configuración de tu Supabase si es necesario
-            # ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool) 
-    )
-}
+            conn_health_checks=True,
+        )
+    }
 
 
 # Password validation
