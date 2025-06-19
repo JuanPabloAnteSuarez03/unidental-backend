@@ -119,7 +119,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         """Crea un nuevo producto. El SKU debe ser único y la categoría debe existir."""
         return super().create(request, *args, **kwargs)
     
-    @swagger_auto_schema(operation_summary="Listar todos los productos",
+    @swagger_auto_schema(operation_summary="Listar todos los productos (paginado)",
                          manual_parameters=[
                              openapi.Parameter('name', openapi.IN_QUERY, description="Filtrar productos por nombre (búsqueda parcial)", type=openapi.TYPE_STRING),
                              openapi.Parameter('sku', openapi.IN_QUERY, description="Filtrar productos por SKU (exacto)", type=openapi.TYPE_STRING),
@@ -128,7 +128,10 @@ class ProductViewSet(viewsets.ModelViewSet):
                              openapi.Parameter('category_name', openapi.IN_QUERY, description="Filtrar productos por nombre de categoría (búsqueda parcial)", type=openapi.TYPE_STRING),
                          ])
     def list(self, request, *args, **kwargs):
-        """Obtiene una lista de todos los productos.
+        """Obtiene una lista paginada de productos - OPTIMIZADO.
+        
+        Usa ProductSummarySerializer liviano para evitar N+1 queries.
+        Para detalles completos usa /api/catalogs/products/{id}/
         
         Filtros disponibles:
         - `?name=textobusqueda` (búsqueda parcial en nombre de producto)
@@ -137,7 +140,21 @@ class ProductViewSet(viewsets.ModelViewSet):
         - `?category=id_categoria` (ID exacto de la categoría)
         - `?category_name=nombrecategoria` (búsqueda parcial en nombre de categoría)
         """
-        return super().list(request, *args, **kwargs)
+        from .serializers import ProductSummarySerializer
+        
+        # Usar queryset optimizado
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Usar paginación estándar de DRF
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            # USAR SERIALIZER LIVIANO para evitar N+1 queries
+            serializer = ProductSummarySerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        # Si no hay paginación, usar serializer liviano también
+        serializer = ProductSummarySerializer(queryset, many=True)
+        return Response(serializer.data)
 
     @swagger_auto_schema(operation_summary="Obtener detalle de un producto")
     def retrieve(self, request, *args, **kwargs):
@@ -180,10 +197,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def all(self, request):
         """
-        Endpoint que devuelve todos los productos sin paginación.
+        Endpoint que devuelve TODOS los productos sin paginación - OPTIMIZADO.
         
-        Este endpoint aplica los mismos filtros que el endpoint list(),
-        pero devuelve todos los resultados sin paginar.
+        Usa ProductSummarySerializer liviano para evitar N+1 queries y poder cargar todos los productos.
         
         Filtros disponibles:
         - ?name=textobusqueda (búsqueda parcial en nombre de producto)
@@ -192,14 +208,17 @@ class ProductViewSet(viewsets.ModelViewSet):
         - ?category=id_categoria (ID exacto de la categoría)
         - ?category_name=nombrecategoria (búsqueda parcial en nombre de categoría)
         """
+        from .serializers import ProductSummarySerializer
+        
         # Aplicar filtros usando el filterset configurado
         queryset = self.filter_queryset(self.get_queryset())
         
-        # Serializar todos los productos sin paginación
-        serializer = self.get_serializer(queryset, many=True)
+        # USAR SERIALIZER LIVIANO que no carga componentes ni lotes
+        # Esto permite cargar TODOS los productos sin timeout
+        serializer = ProductSummarySerializer(queryset, many=True)
         
         return Response({
-            'count': queryset.count(),
+            'count': len(serializer.data),
             'results': serializer.data
         })
 

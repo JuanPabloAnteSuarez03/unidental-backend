@@ -23,14 +23,20 @@ from inventory.models import Location
 
 class DeliveryViewSet(viewsets.ModelViewSet):
     """
-    ViewSet para gestionar entregas y domicilios.
+    ViewSet para gestionar entregas y domicilios - OPTIMIZADO.
     
     Proporciona operaciones CRUD completas para entregas, así como acciones personalizadas
     para actualizar estados, obtener estadísticas y gestionar el seguimiento de envíos.
     """
     
+    # 🚀 OPTIMIZACIÓN: Agregar más relaciones y prefetch para items de venta
     queryset = Delivery.objects.select_related(
-        'sale', 'sale__customer', 'origin_location', 'dest_location'
+        'sale__customer', 
+        'sale__location',  # Agregar location de la venta
+        'origin_location', 
+        'dest_location'
+    ).prefetch_related(
+        'sale__items__product'  # Prefetch items de la venta con sus productos
     ).all()
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
