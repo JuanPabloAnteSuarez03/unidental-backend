@@ -137,41 +137,26 @@ WSGI_APPLICATION = 'unidental.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Configuración simplificada para tests
-if 'test' in sys.argv:
+# La variable de entorno 'USE_SQLITE_FOR_TESTS' se establece a 'True' en el workflow de GitHub Actions
+# para asegurar que los tests usen una base de datos SQLite efímera y no intenten conectar a PostgreSQL.
+USE_SQLITE_FOR_TESTS = os.environ.get('USE_SQLITE_FOR_TESTS') == 'True'
+
+if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
+            'NAME': ':memory:', # Usar base de datos en memoria para tests, es más rápido y limpio.
         }
     }
 else:
-    # Para desarrollo/producción, usar configuración manual más segura
-    DATABASE_URL = config('DATABASE_URL', default='')
-    
-    if DATABASE_URL.startswith('postgres://'):
-        # Convertir postgres:// a postgresql:// para evitar warnings
-        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-    
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': config('DB_NAME', default='unidental'),
-            'USER': config('DB_USER', default='postgres'),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-            'OPTIONS': {
-                'sslmode': 'require' if not DEBUG else 'prefer',
-            },
-        }
-    }
-    
-    # Si hay DATABASE_URL, usarlo para sobreescribir
-    if DATABASE_URL:
-        import dj_database_url
-        db_from_url = dj_database_url.parse(DATABASE_URL)
-        DATABASES['default'].update(db_from_url)
+        'default': dj_database_url.config(
+            default=config('DATABASE_URL'),
+            conn_max_age=600,
+            # Ajusta ssl_require según la configuración de tu Supabase si es necesario
+            # ssl_require=config('DB_SSL_REQUIRE', default=True, cast=bool) 
+    )
+}
 
 
 # Password validation
