@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Customer, Sale, SaleItem, Return, ReturnItem
-from catalogs.models import Product
-from catalogs.serializers import ProductSerializer, ProductSummarySerializer
+from catalogs.models import Product, ProductBatch
+from catalogs.serializers import ProductSerializer, ProductSummarySerializer, ProductBatchSerializer
 from inventory.models import InventoryStock, InventoryMovement, Location
 from inventory.serializers import LocationSerializer
 from django.db import models
@@ -17,26 +17,47 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
-    """Serializador para los items de venta."""
+    """Serializador para los items de venta con soporte para lotes."""
     
     product_details = ProductSerializer(source='product', read_only=True)
+    batch_details = ProductBatchSerializer(source='batch', read_only=True)
     subtotal = serializers.SerializerMethodField()
 
     class Meta:
         model = SaleItem
-        fields = ['id', 'product', 'product_details', 'quantity', 'unit_price', 'subtotal']
+        fields = ['id', 'product', 'product_details', 'batch', 'batch_details', 'quantity', 'unit_price', 'subtotal']
 
     def get_subtotal(self, obj):
         """Calcula el subtotal del item multiplicando cantidad por precio unitario."""
         return obj.quantity * obj.unit_price
 
     def validate(self, data):
-        """Validaciones básicas del item de venta."""
-        quantity = data['quantity']
+        """Validaciones del item de venta con lotes."""
+        quantity = data.get('quantity')
+        product = data.get('product')
+        batch = data.get('batch')
         
-        if quantity <= 0:
+        if quantity and quantity <= 0:
             raise serializers.ValidationError({
                 'quantity': 'La cantidad debe ser mayor a cero'
+            })
+        
+        # Validar que si el producto no requiere control de lotes, no se especifique un lote
+        if product and not product.requires_batch_control and batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto no requiere control de lotes.'
+            })
+        
+        # Validar que si el producto requiere control de lotes, se especifique un lote
+        if product and product.requires_batch_control and not batch:
+            raise serializers.ValidationError({
+                'batch': 'Este producto requiere especificar un lote.'
+            })
+        
+        # Validar que el batch corresponde al producto (solo si se especifica un lote)
+        if batch and product and batch.product != product:
+            raise serializers.ValidationError({
+                'batch': 'El lote no corresponde al producto seleccionado.'
             })
         
         return data
@@ -61,6 +82,7 @@ class SaleSerializer(serializers.ModelSerializer):
         """
         Crea una venta con sus items asociados.
         Actualiza automáticamente el stock de los productos usando la sede especificada.
+        Ahora maneja lotes específicos cuando es necesario.
         """
         items_data = validated_data.pop('items')
         sale = Sale.objects.create(**validated_data)
@@ -68,34 +90,63 @@ class SaleSerializer(serializers.ModelSerializer):
 
         for item_data in items_data:
             product = item_data['product']
+            batch = item_data.get('batch')
             quantity = item_data['quantity']
             
             # Verificar stock en la sede de la venta
-            try:
-                stock_location = InventoryStock.objects.get(
-                    product=product, 
-                    location=sale_location
-                )
-                
-                if stock_location.quantity < quantity:
+            if product.requires_batch_control:
+                # Para productos con control de lotes, verificar stock del lote específico
+                if not batch:
                     raise serializers.ValidationError({
-                        'items': f'Stock insuficiente del producto {product.name} en {sale_location.name}. '
-                                f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                        'items': f'El producto {product.name} requiere especificar un lote.'
                     })
                 
-                # Crear movimiento de salida en inventario
-                InventoryMovement.objects.create(
-                    product=product,
-                    location=sale_location,
-                    movement_type='out',
-                    quantity=quantity,
-                    notes=f'Venta #{sale.id}'
-                )
-                
-            except InventoryStock.DoesNotExist:
-                raise serializers.ValidationError({
-                    'items': f'No hay stock del producto {product.name} en {sale_location.name}'
-                })
+                try:
+                    stock_location = InventoryStock.objects.get(
+                        product=product, 
+                        location=sale_location,
+                        batch=batch
+                    )
+                    
+                    if stock_location.quantity < quantity:
+                        raise serializers.ValidationError({
+                            'items': f'Stock insuficiente del lote {batch.batch_number} del producto {product.name} en {sale_location.name}. '
+                                    f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                        })
+                    
+                except InventoryStock.DoesNotExist:
+                    raise serializers.ValidationError({
+                        'items': f'No hay stock del lote {batch.batch_number} del producto {product.name} en {sale_location.name}'
+                    })
+            else:
+                # Para productos sin control de lotes, verificar stock total
+                try:
+                    stock_location = InventoryStock.objects.get(
+                        product=product, 
+                        location=sale_location,
+                        batch__isnull=True
+                    )
+                    
+                    if stock_location.quantity < quantity:
+                        raise serializers.ValidationError({
+                            'items': f'Stock insuficiente del producto {product.name} en {sale_location.name}. '
+                                    f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                        })
+                    
+                except InventoryStock.DoesNotExist:
+                    raise serializers.ValidationError({
+                        'items': f'No hay stock del producto {product.name} en {sale_location.name}'
+                    })
+            
+            # Crear movimiento de salida en inventario con lote específico
+            InventoryMovement.objects.create(
+                product=product,
+                location=sale_location,
+                batch=batch,
+                movement_type='out',
+                quantity=quantity,
+                notes=f'Venta #{sale.id}'
+            )
             
             SaleItem.objects.create(sale=sale, **item_data)
 
