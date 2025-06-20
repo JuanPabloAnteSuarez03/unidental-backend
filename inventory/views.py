@@ -15,10 +15,11 @@ from .models import Location, InventoryStock, InventoryMovement
 from .serializers import (
     LocationSerializer, InventoryStockSerializer, InventoryMovementSerializer,
     StockAlertSerializer, ExpiryAlertSerializer, StockSummarySerializer,
-    CompositeBreakdownSerializer
+    CompositeBreakdownSerializer, BatchStockSerializer, BatchLocationStockSerializer,
+    ProductBatchesStockSerializer, LocationBatchStockSerializer
 )
 from .filters import LocationFilter, InventoryStockFilter, InventoryMovementFilter
-from catalogs.models import Product
+from catalogs.models import Product, ProductBatch
 
 
 class LocationViewSet(viewsets.ModelViewSet):
@@ -81,6 +82,16 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
             openapi.Parameter('min_quantity', openapi.IN_QUERY, description="Cantidad mínima", type=openapi.TYPE_INTEGER),
             openapi.Parameter('max_quantity', openapi.IN_QUERY, description="Cantidad máxima", type=openapi.TYPE_INTEGER),
             openapi.Parameter('has_stock', openapi.IN_QUERY, description="Solo productos con stock (true) o sin stock (false)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('batch', openapi.IN_QUERY, description="ID del lote específico", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('batch_number', openapi.IN_QUERY, description="Número de lote exacto", type=openapi.TYPE_STRING),
+            openapi.Parameter('batch_number_contains', openapi.IN_QUERY, description="Buscar por número de lote", type=openapi.TYPE_STRING),
+            openapi.Parameter('requires_batch_control', openapi.IN_QUERY, description="Solo productos que requieren control de lotes", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('has_batch', openapi.IN_QUERY, description="Filtrar por existencia de lote (true/false)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('expiry_date', openapi.IN_QUERY, description="Fecha de vencimiento exacta (YYYY-MM-DD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('expiry_from', openapi.IN_QUERY, description="Vence después de esta fecha (YYYY-MM-DD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('expiry_to', openapi.IN_QUERY, description="Vence antes de esta fecha (YYYY-MM-DD)", type=openapi.TYPE_STRING),
+            openapi.Parameter('expiry_days_ahead', openapi.IN_QUERY, description="Vence en los próximos N días", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('is_expired', openapi.IN_QUERY, description="Solo lotes vencidos (true/false)", type=openapi.TYPE_BOOLEAN),
             openapi.Parameter('search', openapi.IN_QUERY, description="Búsqueda general en producto y ubicación", type=openapi.TYPE_STRING),
         ]
     )
@@ -194,6 +205,348 @@ class InventoryStockViewSet(viewsets.ModelViewSet):
             'count': queryset.count(),
             'results': serializer.data
         })
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener stock de un lote específico por ubicaciones",
+        operation_description="Devuelve el stock de un lote específico de un producto distribuido por ubicaciones",
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto (requerido)", type=openapi.TYPE_INTEGER, required=True),
+            openapi.Parameter('batch', openapi.IN_QUERY, description="ID del lote específico (requerido)", type=openapi.TYPE_INTEGER, required=True),
+            openapi.Parameter('location_type', openapi.IN_QUERY, description="Filtrar por tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_name', openapi.IN_QUERY, description="Buscar por nombre de ubicación", type=openapi.TYPE_STRING),
+        ],
+        responses={
+            200: BatchLocationStockSerializer,
+            400: "Parámetros requeridos faltantes"
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def batch_stock_by_locations(self, request):
+        """
+        Obtiene el stock de un lote específico distribuido por ubicaciones.
+        
+        Parámetros requeridos:
+        - product: ID del producto
+        - batch: ID del lote específico
+        
+        Filtros opcionales:
+        - location_type: sede/bodega
+        - location_name: búsqueda por nombre
+        """
+        product_id = request.query_params.get('product')
+        batch_id = request.query_params.get('batch')
+        
+        if not product_id or not batch_id:
+            return Response(
+                {'error': 'Los parámetros product y batch son requeridos'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que el producto y lote existen
+        try:
+            product = Product.objects.get(id=product_id)
+            batch = ProductBatch.objects.get(id=batch_id, product=product)
+        except (Product.DoesNotExist, ProductBatch.DoesNotExist):
+            return Response(
+                {'error': 'Producto o lote no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Obtener stock del lote por ubicaciones
+        stock_query = InventoryStock.objects.filter(
+            product=product,
+            batch=batch,
+            quantity__gt=0
+        ).select_related('location')
+        
+        # Aplicar filtros opcionales
+        location_type = request.query_params.get('location_type')
+        location_name = request.query_params.get('location_name')
+        
+        if location_type:
+            stock_query = stock_query.filter(location__type=location_type)
+        if location_name:
+            stock_query = stock_query.filter(location__name__icontains=location_name)
+        
+        # Procesar datos
+        locations_data = []
+        total_quantity = 0
+        
+        for stock in stock_query:
+            locations_data.append({
+                'location_id': stock.location.id,
+                'location_name': stock.location.name,
+                'location_type': stock.location.type,
+                'quantity': stock.quantity,
+                'last_updated': stock.last_updated
+            })
+            total_quantity += stock.quantity
+        
+        result = {
+            'product_id': product.id,
+            'product_name': product.name,
+            'product_sku': product.sku,
+            'product_unit': product.unit,
+            'requires_batch_control': product.requires_batch_control,
+            'batch_id': batch.id,
+            'batch_number': batch.batch_number,
+            'expiry_date': batch.expiry_date,
+            'days_to_expiry': batch.days_to_expiry,
+            'is_expired': batch.is_expired,
+            'locations': locations_data,
+            'total_quantity': total_quantity
+        }
+        
+        serializer = BatchLocationStockSerializer(result)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener todos los lotes de un producto con stock por ubicaciones",
+        operation_description="Devuelve todos los lotes de un producto específico con su stock distribuido por ubicaciones",
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto (requerido)", type=openapi.TYPE_INTEGER, required=True),
+            openapi.Parameter('location_type', openapi.IN_QUERY, description="Filtrar por tipo de ubicación (sede/bodega)", type=openapi.TYPE_STRING),
+            openapi.Parameter('location_name', openapi.IN_QUERY, description="Buscar por nombre de ubicación", type=openapi.TYPE_STRING),
+            openapi.Parameter('only_available', openapi.IN_QUERY, description="Solo lotes con stock disponible", type=openapi.TYPE_BOOLEAN, default=True),
+            openapi.Parameter('include_expired', openapi.IN_QUERY, description="Incluir lotes vencidos", type=openapi.TYPE_BOOLEAN, default=False),
+        ],
+        responses={
+            200: ProductBatchesStockSerializer,
+            400: "Parámetro product requerido",
+            404: "Producto no encontrado"
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def product_batches_stock(self, request):
+        """
+        Obtiene todos los lotes de un producto con su stock por ubicaciones.
+        
+        Parámetros requeridos:
+        - product: ID del producto
+        
+        Filtros opcionales:
+        - location_type: sede/bodega
+        - location_name: búsqueda por nombre
+        - only_available: solo lotes con stock (default: true)
+        - include_expired: incluir lotes vencidos (default: false)
+        """
+        product_id = request.query_params.get('product')
+        
+        if not product_id:
+            return Response(
+                {'error': 'El parámetro product es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que el producto existe
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Producto no encontrado'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Parámetros de filtro
+        location_type = request.query_params.get('location_type')
+        location_name = request.query_params.get('location_name')
+        only_available = request.query_params.get('only_available', 'true').lower() == 'true'
+        include_expired = request.query_params.get('include_expired', 'false').lower() == 'true'
+        
+        # Construir query base
+        stock_query = InventoryStock.objects.filter(product=product).select_related('batch', 'location')
+        
+        if only_available:
+            stock_query = stock_query.filter(quantity__gt=0)
+        
+        if not include_expired:
+            from django.utils import timezone
+            stock_query = stock_query.filter(
+                Q(batch__isnull=True) | Q(batch__expiry_date__gte=timezone.now().date())
+            )
+        
+        # Aplicar filtros de ubicación
+        if location_type:
+            stock_query = stock_query.filter(location__type=location_type)
+        if location_name:
+            stock_query = stock_query.filter(location__name__icontains=location_name)
+        
+        # Agrupar por lotes
+        batches_dict = {}
+        total_stock = 0
+        
+        for stock in stock_query:
+            batch_id = stock.batch.id if stock.batch else None
+            
+            if batch_id not in batches_dict:
+                batch = stock.batch
+                batches_dict[batch_id] = {
+                    'batch_id': batch.id,
+                    'batch_number': batch.batch_number,
+                    'manufacturing_date': batch.manufacturing_date,
+                    'expiry_date': batch.expiry_date,
+                    'days_to_expiry': batch.days_to_expiry,
+                    'is_expired': batch.is_expired,
+                    'supplier_reference': batch.supplier_reference,
+                    'notes': batch.notes,
+                    'locations': [],
+                    'total_quantity': 0
+                }
+            
+            # Añadir ubicación
+            batches_dict[batch_id]['locations'].append({
+                'location_id': stock.location.id,
+                'location_name': stock.location.name,
+                'location_type': stock.location.type,
+                'quantity': stock.quantity,
+                'last_updated': stock.last_updated
+            })
+            batches_dict[batch_id]['total_quantity'] += stock.quantity
+            total_stock += stock.quantity
+        
+        # Ordenar lotes por fecha de vencimiento (FIFO)
+        batches_list = list(batches_dict.values())
+        batches_list.sort(key=lambda x: x['expiry_date'] if x['expiry_date'] else timezone.now().date())
+        
+        result = {
+            'product_id': product.id,
+            'product_name': product.name,
+            'product_sku': product.sku,
+            'product_unit': product.unit,
+            'requires_batch_control': product.requires_batch_control,
+            'batches': batches_list,
+            'total_stock': total_stock
+        }
+        
+        serializer = ProductBatchesStockSerializer(result)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Obtener stock de lotes en una ubicación específica",
+        operation_description="Devuelve todos los productos con lotes en una ubicación específica",
+        manual_parameters=[
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de la ubicación (requerido)", type=openapi.TYPE_INTEGER, required=True),
+            openapi.Parameter('product', openapi.IN_QUERY, description="Filtrar por ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('product_name', openapi.IN_QUERY, description="Buscar por nombre de producto", type=openapi.TYPE_STRING),
+            openapi.Parameter('batch_number', openapi.IN_QUERY, description="Buscar por número de lote", type=openapi.TYPE_STRING),
+            openapi.Parameter('only_available', openapi.IN_QUERY, description="Solo stock disponible", type=openapi.TYPE_BOOLEAN, default=True),
+            openapi.Parameter('include_expired', openapi.IN_QUERY, description="Incluir lotes vencidos", type=openapi.TYPE_BOOLEAN, default=False),
+        ],
+        responses={
+            200: LocationBatchStockSerializer,
+            400: "Parámetro location requerido",
+            404: "Ubicación no encontrada"
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def location_batch_stock(self, request):
+        """
+        Obtiene todos los productos con lotes en una ubicación específica.
+        
+        Parámetros requeridos:
+        - location: ID de la ubicación
+        
+        Filtros opcionales:
+        - product: ID del producto específico
+        - product_name: búsqueda por nombre
+        - batch_number: búsqueda por número de lote
+        - only_available: solo stock disponible (default: true)
+        - include_expired: incluir lotes vencidos (default: false)
+        """
+        location_id = request.query_params.get('location')
+        
+        if not location_id:
+            return Response(
+                {'error': 'El parámetro location es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Verificar que la ubicación existe
+        try:
+            location = Location.objects.get(id=location_id)
+        except Location.DoesNotExist:
+            return Response(
+                {'error': 'Ubicación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Parámetros de filtro
+        product_id = request.query_params.get('product')
+        product_name = request.query_params.get('product_name')
+        batch_number = request.query_params.get('batch_number')
+        only_available = request.query_params.get('only_available', 'true').lower() == 'true'
+        include_expired = request.query_params.get('include_expired', 'false').lower() == 'true'
+        
+        # Construir query base
+        stock_query = InventoryStock.objects.filter(
+            location=location,
+            batch__isnull=False  # Solo productos con lotes
+        ).select_related('product', 'batch')
+        
+        if only_available:
+            stock_query = stock_query.filter(quantity__gt=0)
+        
+        if not include_expired:
+            from django.utils import timezone
+            stock_query = stock_query.filter(batch__expiry_date__gte=timezone.now().date())
+        
+        # Aplicar filtros
+        if product_id:
+            stock_query = stock_query.filter(product_id=product_id)
+        if product_name:
+            stock_query = stock_query.filter(product__name__icontains=product_name)
+        if batch_number:
+            stock_query = stock_query.filter(batch__batch_number__icontains=batch_number)
+        
+        # Agrupar por producto
+        products_dict = {}
+        
+        for stock in stock_query:
+            product_id = stock.product.id
+            
+            if product_id not in products_dict:
+                products_dict[product_id] = {
+                    'product_id': product_id,
+                    'product_name': stock.product.name,
+                    'product_sku': stock.product.sku,
+                    'product_unit': stock.product.unit,
+                    'requires_batch_control': stock.product.requires_batch_control,
+                    'batches': [],
+                    'total_quantity': 0
+                }
+            
+            # Añadir lote
+            products_dict[product_id]['batches'].append({
+                'batch_id': stock.batch.id,
+                'batch_number': stock.batch.batch_number,
+                'manufacturing_date': stock.batch.manufacturing_date,
+                'expiry_date': stock.batch.expiry_date,
+                'days_to_expiry': stock.batch.days_to_expiry,
+                'is_expired': stock.batch.is_expired,
+                'quantity': stock.quantity,
+                'last_updated': stock.last_updated
+            })
+            products_dict[product_id]['total_quantity'] += stock.quantity
+        
+        # Ordenar productos por nombre y lotes por fecha de vencimiento
+        products_list = list(products_dict.values())
+        products_list.sort(key=lambda x: x['product_name'])
+        
+        for product in products_list:
+            product['batches'].sort(key=lambda x: x['expiry_date'] if x['expiry_date'] else timezone.now().date())
+        
+        result = {
+            'location_id': location.id,
+            'location_name': location.name,
+            'location_type': location.type,
+            'products': products_list
+        }
+        
+        serializer = LocationBatchStockSerializer(result)
+        return Response(serializer.data)
 
 
 class InventoryMovementViewSet(viewsets.ModelViewSet):
