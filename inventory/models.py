@@ -262,17 +262,56 @@ class InventoryMovement(models.Model):
             # Calcular la cantidad total de componentes a mover
             component_quantity = self.quantity * component.quantity
             
-            # Crear el movimiento para el componente
-            InventoryMovement.objects.create(
-                product=component.component_product,
-                location=self.location,
-                batch=None,  # Los componentes no necesariamente tienen el mismo lote
-                movement_type='composite_conversion' if self.movement_type == 'out' else 'in',
-                quantity=component_quantity,
-                user=self.user,
-                notes=f"Movimiento automático por {'venta' if self.movement_type == 'out' else 'ingreso'} de {self.product.name}",
-                related_composite_movement=self
-            )
+            # Si el componente requiere control de lotes, usar múltiples lotes si es necesario
+            if component.component_product.requires_batch_control:
+                # Obtener lotes disponibles ordenados por FIFO
+                available_batches = InventoryStock.objects.filter(
+                    product=component.component_product,
+                    location=self.location,
+                    quantity__gt=0,
+                    batch__isnull=False
+                ).select_related('batch').order_by('batch__expiry_date', 'batch__batch_number')
+                
+                remaining_quantity = component_quantity
+                
+                for stock_record in available_batches:
+                    if remaining_quantity <= 0:
+                        break
+                    
+                    # Determinar cuánto tomar de este lote
+                    quantity_from_batch = min(remaining_quantity, stock_record.quantity)
+                    
+                    # Crear movimiento para este lote específico
+                    InventoryMovement.objects.create(
+                        product=component.component_product,
+                        location=self.location,
+                        batch=stock_record.batch,
+                        movement_type='composite_conversion' if self.movement_type == 'out' else 'in',
+                        quantity=quantity_from_batch,
+                        user=self.user,
+                        notes=f"Movimiento automático por {'venta' if self.movement_type == 'out' else 'ingreso'} de {self.product.name} - Lote {stock_record.batch.batch_number}",
+                        related_composite_movement=self
+                    )
+                    
+                    remaining_quantity -= quantity_from_batch
+                
+                # Verificar que se pudo procesar toda la cantidad
+                if remaining_quantity > 0:
+                    raise ValidationError({
+                        'batch': f'Stock insuficiente del componente {component.component_product.name} en {self.location.name}. Faltaron {remaining_quantity} unidades.'
+                    })
+            else:
+                # Componente sin control de lotes
+                InventoryMovement.objects.create(
+                    product=component.component_product,
+                    location=self.location,
+                    batch=None,
+                    movement_type='composite_conversion' if self.movement_type == 'out' else 'in',
+                    quantity=component_quantity,
+                    user=self.user,
+                    notes=f"Movimiento automático por {'venta' if self.movement_type == 'out' else 'ingreso'} de {self.product.name}",
+                    related_composite_movement=self
+                )
 
     @classmethod
     def create_composite_breakdown(cls, composite_product, location, quantity, user=None, notes=""):
