@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
-from catalogs.models import Product
+from catalogs.models import Product, ProductBatch
 from inventory.models import Location, InventoryMovement
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -119,12 +119,40 @@ class SaleItem(models.Model):
         validators=[MinValueValidator(0)],
         verbose_name="Precio unitario"
     )
+    batch = models.ForeignKey(
+        ProductBatch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='sale_items',
+        verbose_name="Lote",
+        help_text="Lote específico (requerido solo para productos con control de lotes)"
+    )
 
     def __str__(self):
-        return f"{self.quantity} x {self.product.name} en Venta {self.sale.id}"
+        batch_info = f" - Lote: {self.batch.batch_number}" if self.batch else ""
+        return f"{self.quantity} x {self.product.name}{batch_info} en Venta {self.sale.id}"
+
+    def clean(self):
+        """Validaciones personalizadas para el item de venta."""
+        super().clean()
+        
+        # Validar que si el producto no requiere control de lotes, no se especifique un lote
+        if self.product and not self.product.requires_batch_control and self.batch:
+            raise ValidationError({'batch': 'Este producto no requiere control de lotes.'})
+        
+        # Validar que si el producto requiere control de lotes, se especifique un lote
+        if self.product and self.product.requires_batch_control and not self.batch:
+            raise ValidationError({'batch': 'Este producto requiere especificar un lote.'})
+        
+        # Validar que el batch corresponde al producto (solo si se especifica un lote)
+        if self.batch and self.batch.product != self.product:
+            raise ValidationError({'batch': 'El lote no corresponde al producto seleccionado.'})
 
     def save(self, *args, **kwargs):
         """Actualiza los totales de la venta al guardar un item."""
+        # Ejecutar validaciones antes de guardar
+        self.full_clean()
         super().save(*args, **kwargs)
         self.sale.calculate_totals()
 
