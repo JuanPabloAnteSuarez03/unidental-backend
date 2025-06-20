@@ -140,7 +140,7 @@ class SaleSerializer(serializers.ModelSerializer):
         else:
             try:
                 stock_location = InventoryStock.objects.get(
-                    product=product, 
+                    product=product,
                     location=location,
                     batch__isnull=True
                 )
