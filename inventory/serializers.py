@@ -245,11 +245,82 @@ class CompositeBreakdownSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, help_text="Notas adicionales")
 
     def validate_composite_product(self, value):
-        """Validar que el producto sea compuesto."""
+        """Validar que el producto existe y es compuesto."""
         try:
             product = Product.objects.get(id=value)
             if not product.is_composite():
                 raise serializers.ValidationError("El producto debe ser de tipo compuesto/kit.")
+            return value
         except Product.DoesNotExist:
             raise serializers.ValidationError("El producto no existe.")
-        return value 
+
+
+class BatchStockSerializer(serializers.Serializer):
+    """Serializer para mostrar stock agrupado por lotes de un producto específico."""
+    
+    batch_id = serializers.IntegerField()
+    batch_number = serializers.CharField()
+    manufacturing_date = serializers.DateField(allow_null=True)
+    expiry_date = serializers.DateField()
+    days_to_expiry = serializers.IntegerField()
+    is_expired = serializers.BooleanField()
+    supplier_reference = serializers.CharField(allow_null=True)
+    notes = serializers.CharField(allow_null=True)
+    
+    # Stock por ubicación para este lote
+    locations = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Lista de ubicaciones con stock de este lote"
+    )
+    total_quantity = serializers.IntegerField(help_text="Cantidad total del lote en todas las ubicaciones")
+
+
+class BatchLocationStockSerializer(serializers.Serializer):
+    """Serializer para mostrar stock de un lote específico por ubicación."""
+    
+    product_id = serializers.IntegerField()
+    product_name = serializers.CharField()
+    product_sku = serializers.CharField()
+    product_unit = serializers.CharField()
+    requires_batch_control = serializers.BooleanField()
+    
+    batch_id = serializers.IntegerField()
+    batch_number = serializers.CharField()
+    expiry_date = serializers.DateField()
+    days_to_expiry = serializers.IntegerField()
+    is_expired = serializers.BooleanField()
+    
+    # Stock por ubicación
+    locations = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Lista de ubicaciones con stock de este lote específico"
+    )
+    total_quantity = serializers.IntegerField(help_text="Cantidad total del lote en todas las ubicaciones")
+
+
+class ProductBatchesStockSerializer(serializers.Serializer):
+    """Serializer para mostrar todos los lotes de un producto con su stock por ubicación."""
+    
+    product_id = serializers.IntegerField()
+    product_name = serializers.CharField()
+    product_sku = serializers.CharField()
+    product_unit = serializers.CharField()
+    requires_batch_control = serializers.BooleanField()
+    
+    # Lista de lotes con su stock
+    batches = BatchStockSerializer(many=True, help_text="Lista de lotes del producto con stock por ubicación")
+    total_stock = serializers.IntegerField(help_text="Stock total del producto (suma de todos los lotes)")
+
+
+class LocationBatchStockSerializer(serializers.Serializer):
+    """Serializer para mostrar el stock de lotes en una ubicación específica."""
+    
+    location_id = serializers.IntegerField()
+    location_name = serializers.CharField()
+    location_type = serializers.CharField()
+    
+    # Productos con lotes en esta ubicación
+    products = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="Lista de productos con lotes en esta ubicación"
+    ) 
