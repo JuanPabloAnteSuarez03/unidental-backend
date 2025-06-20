@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from .models import Customer, Sale, SaleItem, Return, ReturnItem
-from catalogs.models import Product, ProductBatch
+from catalogs.models import Product, ProductBatch, ProductComponent
 from catalogs.serializers import ProductSerializer, ProductSummarySerializer, ProductBatchSerializer
 from inventory.models import InventoryStock, InventoryMovement, Location
 from inventory.serializers import LocationSerializer
 from django.db import models
+from django.db import transaction
+from decimal import Decimal
 
 
 class CustomerSerializer(serializers.ModelSerializer):
@@ -17,7 +19,7 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 class SaleItemSerializer(serializers.ModelSerializer):
-    """Serializador para los items de venta con soporte para lotes."""
+    """Serializador para los items de venta con soporte para lotes y productos compuestos."""
     
     product_details = ProductSerializer(source='product', read_only=True)
     batch_details = ProductBatchSerializer(source='batch', read_only=True)
@@ -64,7 +66,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 
 
 class SaleSerializer(serializers.ModelSerializer):
-    """Serializador para las ventas con soporte para items anidados."""
+    """Serializador para las ventas con soporte para items anidados y productos compuestos."""
     
     items = SaleItemSerializer(many=True)
     customer_details = CustomerSerializer(source='customer', read_only=True)
@@ -78,11 +80,12 @@ class SaleSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['sale_date', 'total_gross', 'total_net']
 
+    @transaction.atomic
     def create(self, validated_data):
         """
         Crea una venta con sus items asociados.
         Actualiza automáticamente el stock de los productos usando la sede especificada.
-        Ahora maneja lotes específicos cuando es necesario.
+        Maneja productos compuestos/kits y sus componentes inteligentemente.
         """
         items_data = validated_data.pop('items')
         sale = Sale.objects.create(**validated_data)
@@ -93,70 +96,277 @@ class SaleSerializer(serializers.ModelSerializer):
             batch = item_data.get('batch')
             quantity = item_data['quantity']
             
-            # Verificar stock en la sede de la venta
-            if product.requires_batch_control:
-                # Para productos con control de lotes, verificar stock del lote específico
-                if not batch:
-                    raise serializers.ValidationError({
-                        'items': f'El producto {product.name} requiere especificar un lote.'
-                    })
-                
-                try:
-                    stock_location = InventoryStock.objects.get(
-                        product=product, 
-                        location=sale_location,
-                        batch=batch
-                    )
-                    
-                    if stock_location.quantity < quantity:
-                        raise serializers.ValidationError({
-                            'items': f'Stock insuficiente del lote {batch.batch_number} del producto {product.name} en {sale_location.name}. '
-                                    f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
-                        })
-                    
-                except InventoryStock.DoesNotExist:
-                    raise serializers.ValidationError({
-                        'items': f'No hay stock del lote {batch.batch_number} del producto {product.name} en {sale_location.name}'
-                    })
+            # Procesar según el tipo de producto
+            if product.is_composite():
+                # Venta de producto compuesto (kit/caja)
+                self._process_composite_sale(product, batch, quantity, sale, sale_location)
+            elif product.is_component():
+                # Venta de componente individual
+                self._process_component_sale(product, batch, quantity, sale, sale_location)
             else:
-                # Para productos sin control de lotes, verificar stock total
-                try:
-                    stock_location = InventoryStock.objects.get(
-                        product=product, 
-                        location=sale_location,
-                        batch__isnull=True
-                    )
-                    
-                    if stock_location.quantity < quantity:
-                        raise serializers.ValidationError({
-                            'items': f'Stock insuficiente del producto {product.name} en {sale_location.name}. '
-                                    f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
-                        })
-                    
-                except InventoryStock.DoesNotExist:
-                    raise serializers.ValidationError({
-                        'items': f'No hay stock del producto {product.name} en {sale_location.name}'
-                    })
+                # Venta de producto simple
+                self._process_simple_sale(product, batch, quantity, sale, sale_location)
             
-            # Crear movimiento de salida en inventario con lote específico
-            InventoryMovement.objects.create(
-                product=product,
-                location=sale_location,
-                batch=batch,
-                movement_type='out',
-                quantity=quantity,
-                notes=f'Venta #{sale.id}'
-            )
-            
+            # Crear el item de venta
             SaleItem.objects.create(sale=sale, **item_data)
 
         return sale
+
+    def _check_and_reserve_stock(self, product, batch, quantity, location):
+        """Verifica y reserva stock para un producto específico."""
+        if product.requires_batch_control:
+            if not batch:
+                raise serializers.ValidationError({
+                    'items': f'El producto {product.name} requiere especificar un lote.'
+                })
+            
+            try:
+                stock_location = InventoryStock.objects.get(
+                    product=product, 
+                    location=location,
+                    batch=batch
+                )
+                
+                if stock_location.quantity < quantity:
+                    raise serializers.ValidationError({
+                        'items': f'Stock insuficiente del lote {batch.batch_number} del producto {product.name} en {location.name}. '
+                                f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                    })
+                
+            except InventoryStock.DoesNotExist:
+                raise serializers.ValidationError({
+                    'items': f'No hay stock del lote {batch.batch_number} del producto {product.name} en {location.name}'
+                })
+        else:
+            try:
+                stock_location = InventoryStock.objects.get(
+                    product=product, 
+                    location=location,
+                    batch__isnull=True
+                )
+                
+                if stock_location.quantity < quantity:
+                    raise serializers.ValidationError({
+                        'items': f'Stock insuficiente del producto {product.name} en {location.name}. '
+                                f'Disponible: {stock_location.quantity}, Solicitado: {quantity}'
+                    })
+                
+            except InventoryStock.DoesNotExist:
+                raise serializers.ValidationError({
+                    'items': f'No hay stock del producto {product.name} en {location.name}'
+                })
+
+    def _process_composite_sale(self, product, batch, quantity, sale, location):
+        """Procesa la venta de un producto compuesto (kit/caja)."""
+        # Verificar stock del producto compuesto
+        self._check_and_reserve_stock(product, batch, quantity, location)
+        
+        # Crear movimiento de salida del producto compuesto
+        # Esto automáticamente creará movimientos de "composite_conversion" para los componentes
+        InventoryMovement.objects.create(
+            product=product,
+            location=location,
+            batch=batch,
+            movement_type='out',
+            quantity=quantity,
+            notes=f'Venta #{sale.id} - Producto compuesto'
+        )
+
+    def _process_component_sale(self, product, batch, quantity, sale, location):
+        """
+        Procesa la venta de un componente individual.
+        Verifica stock directo primero, luego puede usar kits automáticamente.
+        """
+        # Verificar stock directo del componente
+        available_component_stock = self._get_available_stock(product, batch, location)
+        
+        if available_component_stock >= quantity:
+            # Hay suficiente stock directo del componente
+            self._create_sale_movement(product, batch, quantity, sale, location, 'Componente individual')
+        else:
+            # No hay suficiente stock directo, necesitamos desarmar kits
+            if available_component_stock > 0:
+                # Usar el stock directo disponible primero
+                self._create_sale_movement(product, batch, available_component_stock, sale, location, 'Componente individual')
+            
+            # Calcular cantidad restante que necesitamos de kits
+            remaining_quantity = quantity - available_component_stock
+            
+            # Desarmar kits para obtener los componentes restantes
+            self._breakdown_kits_for_components(product, batch, remaining_quantity, sale, location)
+
+    def _process_simple_sale(self, product, batch, quantity, sale, location):
+        """Procesa la venta de un producto simple."""
+        self._check_and_reserve_stock(product, batch, quantity, location)
+        self._create_sale_movement(product, batch, quantity, sale, location, 'Producto simple')
+
+    def _get_available_stock(self, product, batch, location):
+        """Obtiene el stock disponible de un producto en una ubicación."""
+        try:
+            if product.requires_batch_control and batch:
+                stock = InventoryStock.objects.get(product=product, location=location, batch=batch)
+            else:
+                stock = InventoryStock.objects.get(product=product, location=location, batch__isnull=True)
+            return stock.quantity
+        except InventoryStock.DoesNotExist:
+            return 0
+
+    def _find_kits_containing_component(self, component_product, location):
+        """Encuentra kits que contengan el componente especificado y tienen stock disponible."""
+        kits_info = []
+        
+        # Buscar todos los kits que contienen este componente
+        component_relations = ProductComponent.objects.filter(component_product=component_product)
+        
+        for relation in component_relations:
+            kit_product = relation.composite_product
+            kit_stock = self._get_available_stock(kit_product, None, location)
+            
+            if kit_stock > 0:
+                kits_info.append({
+                    'kit': kit_product,
+                    'quantity': relation.quantity,  # Cantidad de componentes por kit
+                    'available_kits': kit_stock
+                })
+        
+        # Ordenar por eficiencia (más componentes por kit primero)
+        kits_info.sort(key=lambda x: x['quantity'], reverse=True)
+        return kits_info
+
+    def _calculate_total_available_components(self, component_product, location):
+        """Calcula el total de componentes disponibles (directo + de kits)."""
+        # Stock directo del componente
+        direct_stock = 0
+        direct_stocks = InventoryStock.objects.filter(
+            product=component_product,
+            location=location
+        )
+        direct_stock = sum(stock.quantity for stock in direct_stocks)
+        
+        # Stock de componentes en kits
+        kit_stock = 0
+        component_relations = ProductComponent.objects.filter(component_product=component_product)
+        
+        for relation in component_relations:
+            kit_product = relation.composite_product
+            kit_available = self._get_available_stock(kit_product, None, location)
+            kit_stock += kit_available * relation.quantity
+        
+        return direct_stock + kit_stock
+
+    def _breakdown_kits_for_components(self, component_product, batch, needed_quantity, sale, location):
+        """Desarma kits automáticamente para obtener componentes."""
+        kits_with_component = self._find_kits_containing_component(component_product, location)
+        remaining_quantity = needed_quantity
+        
+        for kit_info in kits_with_component:
+            if remaining_quantity <= 0:
+                break
+            
+            kit_product = kit_info['kit']
+            components_per_kit = kit_info['quantity']
+            kit_stock = self._get_available_stock(kit_product, None, location)
+            
+            # Calcular cuántos kits necesitamos desarmar
+            kits_needed = (remaining_quantity + components_per_kit - 1) // components_per_kit  # Redondeo hacia arriba
+            kits_to_use = min(kits_needed, kit_stock)
+            
+            if kits_to_use > 0:
+                # Desarmar los kits necesarios
+                breakdown_movement = InventoryMovement.create_composite_breakdown(
+                    composite_product=kit_product,
+                    location=location,
+                    quantity=kits_to_use,
+                    notes=f'Desarmado automático para venta #{sale.id}'
+                )
+                
+                components_obtained = kits_to_use * components_per_kit
+                components_to_sell = min(components_obtained, remaining_quantity)
+                
+                # Crear movimiento de salida para los componentes del desarmado
+                # Usar el mismo lote que se especificó en la venta para componentes de desarmado
+                self._create_sale_movement(component_product, batch, components_to_sell, sale, location, 
+                                         f'De desarmado de {kits_to_use} unidades de {kit_product.name}')
+                
+                remaining_quantity -= components_to_sell
+
+    def _create_sale_movement(self, product, batch, quantity, sale, location, notes_suffix):
+        """Crea un movimiento de inventario para la venta."""
+        InventoryMovement.objects.create(
+            product=product,
+            location=location,
+            batch=batch,
+            movement_type='out',
+            quantity=quantity,
+            notes=f'Venta #{sale.id} - {notes_suffix}'
+        )
 
     def validate_items(self, items):
         """Valida que la venta tenga al menos un item."""
         if not items:
             raise serializers.ValidationError("Se requiere al menos un item en la venta.")
         return items
+
+    def validate(self, data):
+        """Validaciones de la venta completa, incluyendo stock."""
+        items = data.get('items', [])
+        location = data.get('location')
+        
+        if not location:
+            raise serializers.ValidationError("Se requiere especificar una ubicación.")
+            
+        # Validar stock para cada item
+        validation_errors = {}
+        for idx, item_data in enumerate(items):
+            product = item_data.get('product')
+            batch = item_data.get('batch')
+            quantity = item_data.get('quantity')
+            
+            if not product or not quantity:
+                continue
+                
+            try:
+                # Validar según el tipo de producto
+                if product.is_composite():
+                    # Validar stock de producto compuesto
+                    self._validate_composite_stock(product, batch, quantity, location)
+                elif product.is_component():
+                    # Validar stock total de componente (directo + de kits)
+                    self._validate_component_stock(product, batch, quantity, location)
+                else:
+                    # Validar stock de producto simple
+                    self._validate_simple_stock(product, batch, quantity, location)
+            except serializers.ValidationError as e:
+                validation_errors[f'items[{idx}]'] = e.detail
+        
+        if validation_errors:
+            raise serializers.ValidationError(validation_errors)
+        
+        return data
+
+    def _validate_composite_stock(self, product, batch, quantity, location):
+        """Valida que hay suficiente stock del producto compuesto."""
+        try:
+            self._check_and_reserve_stock(product, batch, quantity, location)
+        except serializers.ValidationError:
+            raise
+    
+    def _validate_component_stock(self, product, batch, quantity, location):
+        """Valida que hay suficiente stock total del componente."""
+        total_available = self._calculate_total_available_components(product, location)
+        
+        if total_available < quantity:
+            raise serializers.ValidationError(
+                f'Stock insuficiente del componente {product.name} en {location.name}. '
+                f'Disponible total: {total_available}, Solicitado: {quantity}'
+            )
+    
+    def _validate_simple_stock(self, product, batch, quantity, location):
+        """Valida que hay suficiente stock del producto simple."""
+        try:
+            self._check_and_reserve_stock(product, batch, quantity, location)
+        except serializers.ValidationError:
+            raise
 
 
 class ReturnItemSerializer(serializers.ModelSerializer):
