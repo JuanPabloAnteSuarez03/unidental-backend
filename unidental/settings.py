@@ -153,7 +153,7 @@ if 'test' in sys.argv or USE_SQLITE_FOR_TESTS:
 else:
     # Configuración de base de datos para desarrollo y producción (PostgreSQL).
     # Lee la URL de la base de datos desde la variable de entorno DATABASE_URL.
-    db_url = os.environ.get('DATABASE_URL')
+    db_url = config('DATABASE_URL', default=None)
     if not db_url:
         raise ValueError("DATABASE_URL no está configurada en el entorno.")
         
@@ -161,7 +161,8 @@ else:
         'default': dj_database_url.parse(
             db_url,
             conn_max_age=600,
-            conn_health_checks=True
+            conn_health_checks=True,
+            ssl_require=True if not DEBUG else False,
         )
     }
 
