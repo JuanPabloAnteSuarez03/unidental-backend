@@ -2,14 +2,14 @@ import csv
 import re
 import os
 from decimal import Decimal, InvalidOperation
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
 
 # Import all models
-from catalogs.models import Category, Product
+from catalogs.models import Category, Product, ProductBatch
 from catalogs.validators import SKUValidator
 from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location, InventoryStock, InventoryMovement
@@ -70,6 +70,7 @@ class Command(BaseCommand):
             'customers': 0,
             'sales': 0,
             'credits': 0,
+            'product_batches': 0,
             'skipped_existing': 0,
         }
         self.errors = []
@@ -193,6 +194,31 @@ class Command(BaseCommand):
             return 'ACE', 'INS', 'MED'
         else:
             return 'ORG', 'VAR', 'GEN'
+
+    def _parse_date(self, date_str):
+        """
+        Convierte una cadena de fecha a un objeto date.
+        Intenta varios formatos comunes.
+        """
+        if not date_str:
+            return None
+        
+        formats_to_try = [
+            '%d/%m/%Y',  # 24/05/2025
+            '%d-%m-%Y',  # 24-05-2025
+            '%Y-%m-%d',  # 2025-05-24
+            '%d/%m/%y',  # 24/05/25
+        ]
+        
+        for fmt in formats_to_try:
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
+        
+        # Si no se pudo parsear, registrar el error
+        self.errors.append(f"Formato de fecha no reconocido para '{date_str}'")
+        return None
 
     def _clean_price(self, price_str):
         """
@@ -394,7 +420,7 @@ class Command(BaseCommand):
         proveedor = row[6].strip() if len(row) > 6 else ''
         inventario_sur = row[7].strip() if len(row) > 7 else ''
         inventario_norte = row[8].strip() if len(row) > 8 else ''
-        fecha_vencimiento = row[9].strip() if len(row) > 9 else ''
+        fecha_vencimiento_str = row[9].strip() if len(row) > 9 else ''
         precio_compra_str = row[10].strip() if len(row) > 10 else ''
         precio_venta_str = row[11].strip() if len(row) > 11 else ''
         
@@ -404,6 +430,7 @@ class Command(BaseCommand):
         stock_sur = self._clean_stock_quantity(inventario_sur)
         stock_norte = self._clean_stock_quantity(inventario_norte)
         supplier_name = self._extract_supplier_name(proveedor)
+        fecha_vencimiento = self._parse_date(fecha_vencimiento_str)
         
         # Determinar unidad basándose en el nombre del producto
         unit = 'unidad'  # por defecto
@@ -508,6 +535,7 @@ class Command(BaseCommand):
                 
                 # 3. Crear ubicaciones básicas
                 self.stdout.write("\n📍 Creando ubicaciones...")
+                sede_sur, sede_norte = None, None
                 if not dry_run:
                     locations = self._create_locations()
                     sede_sur = locations.get('Sede Sur')
@@ -538,6 +566,9 @@ class Command(BaseCommand):
                         if row_num == 1:  # Saltar header
                             continue
                         
+                        if row_num % 100 == 0:
+                            self.stdout.write(f"  - Progreso: {row_num} filas procesadas. Productos creados: {self.stats['products']}. Errores: {len(self.errors)}.")
+                        
                         try:
                             data = self._parse_csv_row(row)
                             if not data:
@@ -556,6 +587,9 @@ class Command(BaseCommand):
                             categoria, subcategoria, tipo = cat_info
                             
                             if not dry_run:
+                                # Determinar si el producto requiere control de lote
+                                requires_batch = data['fecha_vencimiento'] is not None
+
                                 # Crear categoría
                                 categoria_name = self.validator.CATEGORIAS.get(categoria, categoria)
                                 category = self._get_or_create_category(categoria_name)
@@ -563,22 +597,39 @@ class Command(BaseCommand):
                                 # Generar SKU
                                 sku = self._generate_sku(categoria, subcategoria, tipo)
                                 
-                                # Crear producto
-                                product, created = Product.objects.get_or_create(
+                                # Crear o actualizar producto
+                                product_defaults = {
+                                    'name': data['name'],
+                                    'description': data['description'],
+                                    'unit': data['unit'],
+                                    'category': category,
+                                    'requires_batch_control': requires_batch
+                                }
+                                
+                                # Usamos update_or_create para manejar el caso donde el producto
+                                # existe pero necesita ser actualizado (ej: requires_batch_control).
+                                product, created = Product.objects.update_or_create(
                                     sku=sku,
-                                    defaults={
-                                        'name': data['name'],
-                                        'description': data['description'],
-                                        'unit': data['unit'],
-                                        'category': category
-                                    }
+                                    defaults=product_defaults
                                 )
                                 
                                 if created:
                                     self.stats['products'] += 1
-                                    if self.stats['products'] % 50 == 0:
-                                        self.stdout.write(f"  📦 {self.stats['products']} productos procesados...")
                                 
+                                # Crear lote si es necesario
+                                batch_obj = None
+                                if requires_batch:
+                                    # Generar un número de lote único
+                                    batch_number = f"LOTE-{sku}-{data['fecha_vencimiento'].strftime('%Y%m%d')}"
+                                    
+                                    batch_obj, batch_created = ProductBatch.objects.get_or_create(
+                                        product=product,
+                                        batch_number=batch_number,
+                                        defaults={'expiry_date': data['fecha_vencimiento']}
+                                    )
+                                    if batch_created:
+                                        self.stats['product_batches'] += 1
+
                                 # Crear proveedor y opción de compra
                                 if data['supplier_name'] and data['precio_compra']:
                                     supplier = self._get_or_create_supplier(data['supplier_name'])
@@ -603,6 +654,7 @@ class Command(BaseCommand):
                                     stock, created = InventoryStock.objects.get_or_create(
                                         product=product,
                                         location=sede_sur,
+                                        batch=batch_obj,
                                         defaults={'quantity': data['stock_sur']}
                                     )
                                     
@@ -616,7 +668,8 @@ class Command(BaseCommand):
                                             movement_type='in',
                                             quantity=data['stock_sur'],
                                             user=admin_user,
-                                            notes='Stock inicial importado del CSV'
+                                            notes='Stock inicial importado del CSV',
+                                            batch=batch_obj
                                         )
                                         self.stats['inventory_movements'] += 1
                                 
@@ -624,6 +677,7 @@ class Command(BaseCommand):
                                     stock, created = InventoryStock.objects.get_or_create(
                                         product=product,
                                         location=sede_norte,
+                                        batch=batch_obj,
                                         defaults={'quantity': data['stock_norte']}
                                     )
                                     
@@ -637,7 +691,8 @@ class Command(BaseCommand):
                                             movement_type='in',
                                             quantity=data['stock_norte'],
                                             user=admin_user,
-                                            notes='Stock inicial importado del CSV'
+                                            notes='Stock inicial importado del CSV',
+                                            batch=batch_obj
                                         )
                                         self.stats['inventory_movements'] += 1
                                 
@@ -662,9 +717,19 @@ class Command(BaseCommand):
                     if processed_products:
                         import random
                         for i, customer in enumerate(demo_customers):
+                            # Asignar una sede
+                            sale_location = sede_sur if i % 2 == 0 else sede_norte
+                            if not sale_location: # Fallback a la primera que exista
+                                sale_location = sede_sur or sede_norte
+
+                            if not sale_location:
+                                self.errors.append("No se encontró una ubicación (Sede Sur/Norte) para crear la venta de demostración.")
+                                continue
+                                
                             # Crear venta
                             sale = Sale.objects.create(
                                 customer=customer,
+                                location=sale_location,
                                 sale_type='normal',
                                 should_invoice=True,
                                 total_gross=Decimal('0'),
@@ -679,11 +744,28 @@ class Command(BaseCommand):
                                 quantity = random.randint(1, 5)
                                 price = Decimal(str(random.randint(10000, 100000)))
                                 
+                                # Si el producto requiere lote, encontrar uno disponible
+                                sale_item_batch = None
+                                if product.requires_batch_control:
+                                    # Buscar un lote con stock disponible para este producto
+                                    stock_with_batch = InventoryStock.objects.filter(
+                                        product=product,
+                                        batch__isnull=False,
+                                        quantity__gt=0
+                                    ).first()
+                                    
+                                    if stock_with_batch:
+                                        sale_item_batch = stock_with_batch.batch
+                                    else:
+                                        # Si no hay lote con stock, saltar este producto en la venta demo
+                                        continue
+                                
                                 SaleItem.objects.create(
                                     sale=sale,
                                     product=product,
                                     quantity=quantity,
-                                    unit_price=price
+                                    unit_price=price,
+                                    batch=sale_item_batch
                                 )
                                 
                                 total += quantity * price
@@ -725,6 +807,7 @@ class Command(BaseCommand):
         
         self.stdout.write(f"📂 Categorías creadas: {self.stats['categories']}")
         self.stdout.write(f"📦 Productos creados: {self.stats['products']}")
+        self.stdout.write(f"🏭 Lotes de producto creados: {self.stats['product_batches']}")
         self.stdout.write(f"🏢 Proveedores creados: {self.stats['suppliers']}")
         self.stdout.write(f"📍 Ubicaciones creadas: {self.stats['locations']}")
         self.stdout.write(f"💰 Opciones de compra creadas: {self.stats['purchase_options']}")
