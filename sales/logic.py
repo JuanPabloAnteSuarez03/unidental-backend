@@ -33,9 +33,11 @@ def _update_inventory_for_return(return_item, factor):
                 notes=f'{notes_action} de componente via caja {product.name} (Devolución #{return_item.return_obj.id})'
             )
 
-    # Caso 2: El producto devuelto es un 'componente' que podría re-ensamblar una 'caja'
+    # Caso 2: El producto devuelto es un 'componente'
     elif product.product_type == 'component':
-        # Primero, se actualiza el stock del componente devuelto.
+        # Simplemente se actualiza el stock del componente devuelto.
+        # La lógica de re-ensamblaje no debe activarse aquí, ya que el objetivo
+        # es solo restaurar el item al inventario.
         InventoryMovement.objects.create(
             product=product,
             location=location,
@@ -44,13 +46,8 @@ def _update_inventory_for_return(return_item, factor):
             batch=batch, # Si el componente se vende individualmente, puede tener lote
             notes=f'{notes_action} por item #{return_item.id}'
         )
-        
-        # Luego, se verifica si se puede re-ensamblar una caja.
-        # Esta lógica solo aplica al incrementar stock (devolución real).
-        if factor == 1:
-            _check_and_restock_composites(product, location)
 
-    # Caso 3: Es un producto 'simple' o un 'componente' sin lógica de re-ensamblaje
+    # Caso 3: Es un producto 'simple'
     else:
         InventoryMovement.objects.create(
             product=product,
