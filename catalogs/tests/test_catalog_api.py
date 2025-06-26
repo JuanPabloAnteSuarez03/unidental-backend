@@ -368,6 +368,49 @@ class TestProductAPI:
         assert response.status_code == 204, f"Error: {response.data if response.data else ''}"
         assert not Product.objects.filter(pk=product.pk).exists()
 
+    def test_product_thresholds(self, api_client_authenticated):
+        """
+        Prueba la creación y actualización de los umbrales de stock mínimo
+        y días de vencimiento para un producto.
+        """
+        # 1. Crear producto con umbrales
+        payload = {
+            'sku': 'ACE-GUA-LAT-101',
+            'name': 'Producto de Test con Umbrales',
+            'unit': 'unidad',
+            'category': self.category1.pk,
+            'min_stock_threshold': 10,
+            'min_expiry_days_threshold': 90
+        }
+        response = api_client_authenticated.post(self.products_url, payload, format='json')
+        assert response.status_code == 201, f"Error al crear producto con umbrales: {response.data}"
+        assert response.data['min_stock_threshold'] == 10
+        assert response.data['min_expiry_days_threshold'] == 90
+
+        product_id = response.data['id']
+        product_detail_url = reverse('product-detail', kwargs={'pk': product_id})
+
+        # 2. Verificar que los datos se guardaron correctamente con un GET
+        response_get = api_client_authenticated.get(product_detail_url)
+        assert response_get.status_code == 200
+        assert response_get.data['min_stock_threshold'] == 10
+        assert response_get.data['min_expiry_days_threshold'] == 90
+
+        # 3. Actualizar parcialmente (PATCH) los umbrales
+        update_payload = {
+            'min_stock_threshold': 20,
+            'min_expiry_days_threshold': 120
+        }
+        response_patch = api_client_authenticated.patch(product_detail_url, update_payload, format='json')
+        assert response_patch.status_code == 200, f"Error al actualizar umbrales: {response_patch.data}"
+        assert response_patch.data['min_stock_threshold'] == 20
+        assert response_patch.data['min_expiry_days_threshold'] == 120
+
+        # 4. Verificar que la actualización fue exitosa
+        product = Product.objects.get(pk=product_id)
+        assert product.min_stock_threshold == 20
+        assert product.min_expiry_days_threshold == 120
+
 @pytest.mark.django_db
 class TestSKUValidation:
     """Tests para el sistema de validación de SKU."""
