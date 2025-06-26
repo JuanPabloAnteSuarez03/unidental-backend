@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from sales.models import Customer, Sale, SaleItem, Return, ReturnItem
 from inventory.models import Location, InventoryStock
-from catalogs.models import Category, Product
+from catalogs.models import Category, Product, ProductBatch, ProductComponent
 
 User = get_user_model()
 
@@ -103,6 +103,66 @@ def test_data():
         'location': location,
         'inventory_stock': inventory_stock,
         'customer': customer,
+        'sale': sale,
+        'sale_item': sale_item
+    }
+
+
+@pytest.fixture
+def composite_test_data():
+    """Fixture para crear datos de prueba con productos compuestos."""
+    category = Category.objects.create(name='Kits de Limpieza')
+    location = Location.objects.create(name='Bodega Principal Composites', type='bodega')
+
+    # Producto Compuesto (la caja)
+    composite_product = Product.objects.create(
+        sku='KIT-LIMPIEZA-01',
+        name='Kit de Limpieza Dental',
+        product_type='composite',
+        category=category,
+        unit='kit'
+    )
+    # No se crea stock para la caja directamente, depende de sus componentes
+
+    # Componentes
+    component1 = Product.objects.create(
+        sku='COMP-CEP-01',
+        name='Cepillo Dental Pro',
+        product_type='component',
+        category=category,
+        unit='unidad'
+    )
+    component2 = Product.objects.create(
+        sku='COMP-PAS-01',
+        name='Pasta Dental Blanqueadora',
+        product_type='component',
+        category=category,
+        unit='tubo'
+    )
+
+    # Vincular componentes a la caja
+    ProductComponent.objects.create(composite_product=composite_product, component_product=component1, quantity=1)
+    ProductComponent.objects.create(composite_product=composite_product, component_product=component2, quantity=2)
+
+    # Stock inicial de los componentes
+    InventoryStock.objects.create(product=component1, location=location, quantity=50)
+    InventoryStock.objects.create(product=component2, location=location, quantity=100)
+    
+    # Crear venta de un kit
+    sale = Sale.objects.create(location=location, total_gross=Decimal('50.00'), total_net=Decimal('50.00'))
+    sale_item = SaleItem.objects.create(
+        sale=sale,
+        product=composite_product,
+        quantity=1,
+        unit_price=Decimal('50.00')
+    )
+    # Asumimos que la lógica de venta descuenta los componentes: comp1: 49, comp2: 98
+
+    return {
+        'location': location,
+        'composite_product': composite_product,
+        'component1': component1,
+        'component2': component2,
         'sale': sale,
         'sale_item': sale_item
     }
@@ -460,3 +520,106 @@ class TestReturnItemAPI:
         response = api_client_authenticated.get(url)
         assert response.status_code == 200
         assert len(response.data) >= 1 
+
+
+@pytest.mark.django_db
+class TestReturnBusinessLogic:
+    """Pruebas para la lógica de negocio de las devoluciones."""
+
+    def test_return_of_batched_product(self, test_data):
+        """Prueba que la devolución de un producto con lote incrementa el stock del lote correcto."""
+        # Setup: Crear producto con lote y venderlo
+        product_batched = Product.objects.create(
+            sku='API-BATCH-001', name='Producto con Lote', requires_batch_control=True, unit='unidad', category=test_data['category']
+        )
+        batch = ProductBatch.objects.create(
+            product=product_batched, batch_number='LOTE2024XYZ', expiry_date=date.today() + timedelta(days=365)
+        )
+        location = test_data['location']
+        stock, _ = InventoryStock.objects.get_or_create(product=product_batched, location=location, batch=batch, defaults={'quantity': 50})
+        
+        sale = Sale.objects.create(location=location)
+        sale_item_batched = SaleItem.objects.create(
+            sale=sale, product=product_batched, quantity=5, unit_price=10, batch=batch
+        )
+        # Simular descuento de inventario por venta
+        stock.quantity -= 5
+        stock.save()
+        assert InventoryStock.objects.get(id=stock.id).quantity == 45
+
+        # Acción: Crear la devolución
+        return_obj = Return.objects.create(original_sale=sale, location=location, reason='defective')
+        ReturnItem.objects.create(
+            return_obj=return_obj, sale_item=sale_item_batched, product=product_batched, quantity_returned=3, unit_price=10
+        )
+
+        # Assert: Verificar que el stock del lote específico se incrementó
+        stock.refresh_from_db()
+        assert stock.quantity == 48  # 45 + 3
+
+    def test_return_of_composite_product(self, composite_test_data):
+        """Prueba que devolver un producto compuesto incrementa el stock de sus componentes."""
+        # Setup
+        location = composite_test_data['location']
+        comp1 = composite_test_data['component1']
+        comp2 = composite_test_data['component2']
+        
+        # Simular descuento por venta (1 kit = 1 comp1, 2 comp2)
+        stock1 = InventoryStock.objects.get(product=comp1, location=location)
+        stock2 = InventoryStock.objects.get(product=comp2, location=location)
+        stock1.quantity -= 1
+        stock2.quantity -= 2
+        stock1.save()
+        stock2.save()
+        assert InventoryStock.objects.get(id=stock1.id).quantity == 49
+        assert InventoryStock.objects.get(id=stock2.id).quantity == 98
+        
+        # Acción: Devolver el kit
+        return_obj = Return.objects.create(original_sale=composite_test_data['sale'], location=location, reason='other')
+        ReturnItem.objects.create(
+            return_obj=return_obj,
+            sale_item=composite_test_data['sale_item'],
+            product=composite_test_data['composite_product'],
+            quantity_returned=1,
+            unit_price=50
+        )
+        
+        # Assert: El stock de los componentes debe haber vuelto a su estado inicial
+        assert InventoryStock.objects.get(id=stock1.id).quantity == 50 # 49 + 1
+        assert InventoryStock.objects.get(id=stock2.id).quantity == 100 # 98 + 2
+
+    def test_return_of_component_triggers_reassembly(self, composite_test_data):
+        """Prueba que devolver suficientes componentes puede re-ensamblar una caja."""
+        # Setup: Dejar el stock listo para que falte 1 solo componente
+        location = composite_test_data['location']
+        comp1 = composite_test_data['component1']
+        comp2 = composite_test_data['component2']
+        composite = composite_test_data['composite_product']
+
+        # Vender todos los cepillos menos uno
+        stock_comp1 = InventoryStock.objects.get(product=comp1, location=location)
+        stock_comp1.quantity = 0
+        stock_comp1.save()
+
+        # Asegurar que no hay stock del composite
+        InventoryStock.objects.filter(product=composite, location=location).delete()
+
+        # Crear una venta separada para un componente que será devuelto
+        sale_comp = Sale.objects.create(location=location)
+        sale_item_comp = SaleItem.objects.create(sale=sale_comp, product=comp1, quantity=1, unit_price=10)
+
+        # Acción: Devolver el componente que faltaba
+        return_obj = Return.objects.create(original_sale=sale_comp, location=location, reason='other')
+        ReturnItem.objects.create(
+            return_obj=return_obj, sale_item=sale_item_comp, product=comp1, quantity_returned=1, unit_price=10
+        )
+
+        # Assert: Se debió re-ensamblar una caja
+        # Stock componente 1: 0 (sube a 1 con la devolución, baja a 0 con el re-ensamblaje)
+        # Stock componente 2: 98 (baja a 98 por el re-ensamblaje de 2 unidades)
+        # Stock de la caja: 1
+        assert InventoryStock.objects.get(product=comp1, location=location).quantity == 0
+        assert InventoryStock.objects.get(product=comp2, location=location).quantity == 98
+        
+        composite_stock = InventoryStock.objects.get(product=composite, location=location)
+        assert composite_stock.quantity == 1 
