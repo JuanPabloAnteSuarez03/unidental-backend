@@ -106,31 +106,43 @@ def _check_and_restock_composites(component, location):
             InventoryMovement.objects.create(
                 product=composite,
                 location=location,
-                movement_type='in',
+                # Las cajas/kits pueden tener su propio lote, pero en el re-ensamblaje
+                # desde componentes sueltos, no se asigna un lote específico para la caja.
+                batch=None, 
+                movement_type='composite_assembly',
                 quantity=1,
                 notes=f'Re-ensamblaje de caja por devolución de {component.name}'
             )
             
-            # 2. Descontar el stock de los componentes utilizados DIRECTAMENTE
+            # 2. Descontar el stock de los componentes utilizados
             for required_component_link in composite.composite_components.all():
                 req_comp = required_component_link.component_product
                 req_qty = required_component_link.quantity
-                
-                # Actualización directa del stock
-                stock_item, created = InventoryStock.objects.get_or_create(
-                    product=req_comp,
-                    location=location,
-                    # Los componentes de un kit no tienen lote individual en este contexto
-                    batch=None, 
-                    defaults={'quantity': 0}
-                )
-                stock_item.quantity -= req_qty
-                stock_item.save()
 
-                # Registrar el movimiento para trazabilidad, pero la lógica principal ya se ejecutó
+                # Si un componente requiere lote, debemos encontrar un lote con stock suficiente.
+                # Aquí asumimos una estrategia FIFO (First-In, First-Out) para simplicidad,
+                # usando el lote más antiguo con stock disponible.
+                component_batch = None
+                if req_comp.requires_batch_control:
+                    stock_entry = InventoryStock.objects.filter(
+                        product=req_comp,
+                        location=location,
+                        quantity__gte=req_qty,
+                        batch__isnull=False
+                    ).order_by('batch__expiry_date').first()
+
+                    if not stock_entry:
+                        # Este caso no debería ocurrir si `can_restock` es verdadero,
+                        # pero es una salvaguarda.
+                        continue
+                    
+                    component_batch = stock_entry.batch
+
+                # Registrar el movimiento de salida del componente
                 InventoryMovement.objects.create(
                     product=req_comp,
                     location=location,
+                    batch=component_batch,
                     movement_type='out',
                     quantity=req_qty,
                     notes=f'Uso de componente para re-ensamblaje de {composite.name}'
