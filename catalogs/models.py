@@ -101,6 +101,18 @@ class Product(models.Model):
         verbose_name="Requiere Control de Lotes",
         help_text="Marcar si este producto requiere seguimiento por lotes (fechas de vencimiento)"
     )
+    min_stock_threshold = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Umbral Mínimo de Stock",
+        help_text="Cantidad mínima de stock aceptable para este producto en una sede."
+    )
+    min_expiry_days_threshold = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Umbral Mínimo de Días de Vencimiento",
+        help_text="Número mínimo de días antes del vencimiento para que un lote sea considerado aceptable."
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Fecha de Creación"

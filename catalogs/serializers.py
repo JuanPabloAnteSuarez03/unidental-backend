@@ -101,8 +101,8 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'sku', 'barcode', 'name', 'description', 'unit',
             'category', 'category_name', 'product_type', 'product_type_display',
-            'requires_batch_control', 'components', 'parent_kits',
-            'batches', 'active_batches_count', 'created_at', 'updated_at'
+            'requires_batch_control', 'min_stock_threshold', 'min_expiry_days_threshold',
+            'components', 'parent_kits', 'batches', 'active_batches_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ('created_at', 'updated_at', 'category_name', 'product_type_display')
 
@@ -135,6 +135,6 @@ class ProductSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'id', 'sku', 'name', 'unit', 'category_name', 
+            'id', 'sku', 'barcode', 'name', 'unit', 'category', 'category_name', 
             'product_type', 'product_type_display', 'requires_batch_control'
         ] 

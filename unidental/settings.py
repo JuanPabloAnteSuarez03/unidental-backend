@@ -249,45 +249,19 @@ REST_FRAMEWORK = {
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple' if DEBUG else 'verbose',
         },
-        'file': {
-            'class': 'logging.FileHandler',
-            'filename': 'django.log',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO' if DEBUG else 'WARNING',
     },
     'loggers': {
         'django': {
             'handlers': ['console'],
-            'level': 'INFO' if DEBUG else 'WARNING',
-            'propagate': False,
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
         },
-        'django.db.backends': {
+        'django.server': {
             'handlers': ['console'],
-            'level': 'DEBUG' if DEBUG else 'ERROR',
-            'propagate': False,
-        },
-        'django.request': {
-            'handlers': ['console'],
-            'level': 'ERROR',
+            'level': 'WARNING',  # Cambiado de INFO a WARNING para ocultar logs de peticiones
             'propagate': False,
         },
     },

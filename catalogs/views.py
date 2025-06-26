@@ -84,6 +84,15 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     Permite CRUD de productos. Cada producto debe estar asociado a una categoría.
     El SKU (Stock Keeping Unit) debe ser único para cada producto.
+
+    **Umbrales de Alerta:**
+    - `min_stock_threshold`: Define la cantidad mínima de stock aceptable para un producto
+      en una ubicación específica. Si el stock cae por debajo de este umbral, se puede
+      generar una alerta. Es un campo opcional.
+    - `min_expiry_days_threshold`: Define el número mínimo de días antes de la fecha de
+      vencimiento que un lote de producto debe tener para ser considerado "óptimo".
+      Lotes con menos días hasta su vencimiento pueden ser marcados para venta prioritaria
+      o para no ser aceptados en una compra. Es un campo opcional.
     """
     queryset = Product.objects.select_related('category').all()
     serializer_class = ProductSerializer
@@ -161,12 +170,20 @@ class ProductViewSet(viewsets.ModelViewSet):
         """Obtiene los detalles de un producto específico por su ID."""
         return super().retrieve(request, *args, **kwargs)
     
-    @swagger_auto_schema(operation_summary="Actualizar un producto")
+    @swagger_auto_schema(
+        operation_summary="Actualizar un producto",
+        operation_description="Actualiza completamente un producto existente por su ID. Incluye la posibilidad de establecer umbrales de stock y vencimiento.",
+        request_body=ProductSerializer
+    )
     def update(self, request, *args, **kwargs):
         """Actualiza completamente un producto existente por su ID."""
         return super().update(request, *args, **kwargs)
 
-    @swagger_auto_schema(operation_summary="Actualizar parcialmente un producto")
+    @swagger_auto_schema(
+        operation_summary="Actualizar parcialmente un producto",
+        operation_description="Actualiza parcialmente un producto existente por su ID. Ideal para modificar solo ciertos campos como los umbrales de stock y vencimiento.",
+        request_body=ProductSerializer
+    )
     def partial_update(self, request, *args, **kwargs):
         """Actualiza parcialmente un producto existente por su ID."""
         return super().partial_update(request, *args, **kwargs)
