@@ -1,0 +1,137 @@
+from django.db import transaction
+from inventory.models import InventoryMovement, InventoryStock
+from catalogs.models import Product, ProductComponent
+
+def _update_inventory_for_return(return_item, factor):
+    """
+    Procesa o revierte el movimiento de inventario para un item devuelto.
+    - factor = 1 para procesar la devolución (incrementar stock).
+    - factor = -1 para revertir la devolución (disminuir stock).
+    """
+    product = return_item.product
+    location = return_item.return_obj.location
+    quantity = return_item.quantity_returned * factor
+    batch = return_item.sale_item.batch
+    
+    movement_type = 'in' if factor == 1 else 'out'
+    notes_action = "Devolución" if factor == 1 else "Reversión de devolución"
+
+    # Caso 1: El producto devuelto es una 'caja' (composite)
+    if product.product_type == 'composite':
+        # Aumentar el stock de sus componentes
+        for component_link in product.composite_components.all():
+            component = component_link.component_product
+            component_quantity = component_link.quantity * quantity
+            
+            # Los componentes de una caja no se venden por lote individual,
+            # por lo que su devolución tampoco se asocia a un lote específico.
+            InventoryMovement.objects.create(
+                product=component,
+                location=location,
+                movement_type=movement_type,
+                quantity=abs(component_quantity),
+                notes=f'{notes_action} de componente via caja {product.name} (Devolución #{return_item.return_obj.id})'
+            )
+
+    # Caso 2: El producto devuelto es un 'componente' que podría re-ensamblar una 'caja'
+    elif product.product_type == 'component':
+        # Primero, se actualiza el stock del componente devuelto.
+        InventoryMovement.objects.create(
+            product=product,
+            location=location,
+            movement_type=movement_type,
+            quantity=abs(quantity),
+            batch=batch, # Si el componente se vende individualmente, puede tener lote
+            notes=f'{notes_action} por item #{return_item.id}'
+        )
+        
+        # Luego, se verifica si se puede re-ensamblar una caja.
+        # Esta lógica solo aplica al incrementar stock (devolución real).
+        if factor == 1:
+            _check_and_restock_composites(product, location)
+
+    # Caso 3: Es un producto 'simple' o un 'componente' sin lógica de re-ensamblaje
+    else:
+        InventoryMovement.objects.create(
+            product=product,
+            location=location,
+            movement_type=movement_type,
+            quantity=abs(quantity),
+            batch=batch, # Se asigna el lote original de la venta
+            notes=f'{notes_action} por item #{return_item.id}'
+        )
+
+@transaction.atomic
+def process_return_item(return_item):
+    """Procesa el movimiento de inventario para un item devuelto."""
+    _update_inventory_for_return(return_item, factor=1)
+
+@transaction.atomic
+def reverse_return_item(return_item):
+    """Revierte el movimiento de inventario para un item de devolución eliminado."""
+    _update_inventory_for_return(return_item, factor=-1)
+
+
+def _check_and_restock_composites(component, location):
+    """
+    Verifica si la devolución de un componente permite re-completar el stock de un producto compuesto (caja).
+    """
+    # Encontrar todas las 'cajas' que contienen este 'componente'
+    composite_links = ProductComponent.objects.filter(component_product=component)
+    
+    for link in composite_links:
+        composite = link.composite_product
+        
+        can_restock = True
+        
+        # Verificar si hay stock suficiente de TODOS los componentes para esta caja
+        for required_component_link in composite.composite_components.all():
+            req_comp = required_component_link.component_product
+            req_qty = required_component_link.quantity
+            
+            stock = InventoryStock.objects.filter(product=req_comp, location=location).first()
+            
+            # Ajuste clave: si estamos comprobando el mismo componente que se devolvió,
+            # su stock ya se incrementó. Debemos comprobar si, DESPUÉS de usarlo para
+            # re-ensamblar, sigue habiendo suficiente.
+            current_stock_quantity = stock.quantity if stock else 0
+            
+            if not stock or current_stock_quantity < req_qty:
+                can_restock = False
+                break
+        
+        # Si hay suficientes componentes, se "re-ensambla" la caja
+        if can_restock:
+            # 1. Incrementar el stock de la caja
+            InventoryMovement.objects.create(
+                product=composite,
+                location=location,
+                movement_type='in',
+                quantity=1,
+                notes=f'Re-ensamblaje de caja por devolución de {component.name}'
+            )
+            
+            # 2. Descontar el stock de los componentes utilizados DIRECTAMENTE
+            for required_component_link in composite.composite_components.all():
+                req_comp = required_component_link.component_product
+                req_qty = required_component_link.quantity
+                
+                # Actualización directa del stock
+                stock_item, created = InventoryStock.objects.get_or_create(
+                    product=req_comp,
+                    location=location,
+                    # Los componentes de un kit no tienen lote individual en este contexto
+                    batch=None, 
+                    defaults={'quantity': 0}
+                )
+                stock_item.quantity -= req_qty
+                stock_item.save()
+
+                # Registrar el movimiento para trazabilidad, pero la lógica principal ya se ejecutó
+                InventoryMovement.objects.create(
+                    product=req_comp,
+                    location=location,
+                    movement_type='out',
+                    quantity=req_qty,
+                    notes=f'Uso de componente para re-ensamblaje de {composite.name}'
+                ) 

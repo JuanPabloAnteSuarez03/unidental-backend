@@ -5,6 +5,7 @@ from catalogs.models import Product, ProductBatch
 from inventory.models import Location, InventoryMovement
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from sales.logic import process_return_item, reverse_return_item
 
 
 class Customer(models.Model):
@@ -324,28 +325,16 @@ def update_return_total(sender, instance, **kwargs):
 @receiver(post_save, sender=ReturnItem)
 def update_inventory_on_return_item_save(sender, instance, created, **kwargs):
     """
-    Actualiza el inventario cuando se crea o actualiza un item de devolución.
-    - Si se crea, añade el stock de vuelta.
-    - Si se actualiza, la lógica se maneja en el serializador para comparar la cantidad vieja y nueva.
+    Actualiza el inventario cuando se crea un item de devolución.
+    La lógica detallada (lotes, compuestos) se delega a sales.logic.
     """
     if created:
-        InventoryMovement.objects.create(
-            product=instance.product,
-            location=instance.return_obj.location,
-            movement_type='in',
-            quantity=instance.quantity_returned,
-            notes=f'Devolución por item #{instance.id}'
-        )
+        process_return_item(instance)
 
 @receiver(post_delete, sender=ReturnItem)
 def update_inventory_on_return_item_delete(sender, instance, **kwargs):
     """
     Revierte el stock cuando se elimina un item de devolución.
+    La lógica detallada (lotes, compuestos) se delega a sales.logic.
     """
-    InventoryMovement.objects.create(
-        product=instance.product,
-        location=instance.return_obj.location,
-        movement_type='out',
-        quantity=instance.quantity_returned,
-        notes=f'Reversión por eliminación de item de devolución #{instance.id}'
-    )
+    reverse_return_item(instance)
