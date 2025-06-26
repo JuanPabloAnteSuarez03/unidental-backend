@@ -118,6 +118,7 @@ class InventoryMovement(models.Model):
         ('in', 'Entrada'),
         ('out', 'Salida'),
         ('composite_conversion', 'Conversión de Producto Compuesto'),
+        ('composite_assembly', 'Ensamblaje de Compuesto'),
     ]
     
     product = models.ForeignKey(
@@ -186,7 +187,8 @@ class InventoryMovement(models.Model):
             raise ValidationError({'quantity': 'La cantidad debe ser mayor a cero.'})
         
         # Validar tipo de movimiento
-        if self.movement_type not in ['in', 'out', 'composite_conversion']:
+        valid_movement_types = [choice[0] for choice in self.MOVEMENT_TYPE_CHOICES]
+        if self.movement_type not in valid_movement_types:
             raise ValidationError({'movement_type': 'Tipo de movimiento inválido.'})
         
         # Validar que el batch corresponde al producto
@@ -241,7 +243,7 @@ class InventoryMovement(models.Model):
         )
         
         # Actualizar la cantidad según el tipo de movimiento
-        if self.movement_type == 'in':
+        if self.movement_type in ['in', 'composite_assembly']:
             stock.quantity += self.quantity
         elif self.movement_type in ['out', 'composite_conversion']:
             stock.quantity -= self.quantity
