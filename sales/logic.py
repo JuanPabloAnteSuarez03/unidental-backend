@@ -19,10 +19,12 @@ def _update_inventory_for_return(return_item, factor):
     # Caso 1: El producto devuelto es una 'caja' (composite)
     if product.product_type == 'composite':
         # 1. Crear movimiento para el producto compuesto (caja)
+        # Los productos compuestos generalmente no requieren control de lotes
+        composite_batch = batch if product.requires_batch_control else None
         InventoryMovement.objects.create(
             product=product,
             location=location,
-            batch=batch,  # Las cajas no tienen lote normalmente
+            batch=composite_batch,
             movement_type=movement_type,
             quantity=abs(quantity),
             notes=f'{notes_action} de producto compuesto (Devolución #{return_item.return_obj.id})'
@@ -62,23 +64,25 @@ def _update_inventory_for_return(return_item, factor):
         # Simplemente se actualiza el stock del componente devuelto.
         # La lógica de re-ensamblaje no debe activarse aquí, ya que el objetivo
         # es solo restaurar el item al inventario.
+        component_batch = batch if product.requires_batch_control else None
         InventoryMovement.objects.create(
             product=product,
             location=location,
             movement_type=movement_type,
             quantity=abs(quantity),
-            batch=batch, # Si el componente se vende individualmente, puede tener lote
+            batch=component_batch,
             notes=f'{notes_action} por item #{return_item.id}'
         )
 
     # Caso 3: Es un producto 'simple'
     else:
+        simple_batch = batch if product.requires_batch_control else None
         InventoryMovement.objects.create(
             product=product,
             location=location,
             movement_type=movement_type,
             quantity=abs(quantity),
-            batch=batch, # Se asigna el lote original de la venta
+            batch=simple_batch,
             notes=f'{notes_action} por item #{return_item.id}'
         )
 
