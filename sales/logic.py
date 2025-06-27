@@ -18,16 +18,40 @@ def _update_inventory_for_return(return_item, factor):
 
     # Caso 1: El producto devuelto es una 'caja' (composite)
     if product.product_type == 'composite':
-        # Aumentar el stock de sus componentes
+        # 1. Crear movimiento para el producto compuesto (caja)
+        InventoryMovement.objects.create(
+            product=product,
+            location=location,
+            batch=batch,  # Las cajas no tienen lote normalmente
+            movement_type=movement_type,
+            quantity=abs(quantity),
+            notes=f'{notes_action} de producto compuesto (Devolución #{return_item.return_obj.id})'
+        )
+        
+        # 2. Aumentar el stock de sus componentes
         for component_link in product.composite_components.all():
             component = component_link.component_product
             component_quantity = component_link.quantity * quantity
             
-            # Los componentes de una caja no se venden por lote individual,
-            # por lo que su devolución tampoco se asocia a un lote específico.
+            # Para productos compuestos, devolvemos los componentes al lote más próximo a vencer
+            # usando la misma lógica FIFO que se usó en la venta
+            component_batch = None
+            if component.requires_batch_control:
+                # Buscar el lote más próximo a vencer con stock (para devolver)
+                from inventory.models import InventoryStock
+                stock_entry = InventoryStock.objects.filter(
+                    product=component,
+                    location=location,
+                    batch__isnull=False
+                ).order_by('batch__expiry_date').first()
+                
+                if stock_entry:
+                    component_batch = stock_entry.batch
+            
             InventoryMovement.objects.create(
                 product=component,
                 location=location,
+                batch=component_batch,
                 movement_type=movement_type,
                 quantity=abs(component_quantity),
                 notes=f'{notes_action} de componente via caja {product.name} (Devolución #{return_item.return_obj.id})'
