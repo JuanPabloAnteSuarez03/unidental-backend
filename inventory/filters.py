@@ -36,6 +36,7 @@ class InventoryStockFilter(django_filters.FilterSet):
     product = django_filters.NumberFilter(field_name='product__id')
     product_name = django_filters.CharFilter(field_name='product__name', lookup_expr='icontains')
     product_sku = django_filters.CharFilter(field_name='product__sku', lookup_expr='icontains')
+    product_sku_exact = django_filters.CharFilter(field_name='product__sku', lookup_expr='iexact')
     product_category = django_filters.NumberFilter(field_name='product__category__id')
     product_category_name = django_filters.CharFilter(field_name='product__category__name', lookup_expr='icontains')
     
@@ -68,7 +69,7 @@ class InventoryStockFilter(django_filters.FilterSet):
         model = InventoryStock
         fields = [
             'location', 'location_type', 'location_name',
-            'product', 'product_name', 'product_sku', 'product_category', 'product_category_name',
+            'product', 'product_name', 'product_sku', 'product_sku_exact', 'product_category', 'product_category_name',
             'min_quantity', 'max_quantity', 'has_stock',
             'batch', 'batch_number', 'batch_number_contains', 'requires_batch_control', 'has_batch',
             'expiry_date', 'expiry_from', 'expiry_to', 'expiry_days_ahead', 'is_expired'
@@ -145,6 +146,7 @@ class InventoryMovementFilter(django_filters.FilterSet):
     product = django_filters.NumberFilter(field_name='product__id')
     product_name = django_filters.CharFilter(field_name='product__name', lookup_expr='icontains')
     product_sku = django_filters.CharFilter(field_name='product__sku', lookup_expr='icontains')
+    product_sku_exact = django_filters.CharFilter(field_name='product__sku', lookup_expr='iexact')
     product_category = django_filters.NumberFilter(field_name='product__category__id')
     
     # NUEVOS FILTROS PARA LOTES EN MOVIMIENTOS
@@ -166,7 +168,7 @@ class InventoryMovementFilter(django_filters.FilterSet):
             'occurred_from', 'occurred_to', 'occurred_date',
             'expiry_from', 'expiry_to', 'has_expiry',
             'location_type', 'location_name',
-            'product', 'product_name', 'product_sku', 'product_category',
+            'product', 'product_name', 'product_sku', 'product_sku_exact', 'product_category',
             'batch', 'batch_number', 'batch_number_contains',
             'min_quantity', 'max_quantity',
             'user_username'
