@@ -136,5 +136,6 @@ class ProductSummarySerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'sku', 'barcode', 'name', 'unit', 'category', 'category_name', 
-            'product_type', 'product_type_display', 'requires_batch_control'
+            'product_type', 'product_type_display', 'requires_batch_control',
+            'min_stock_threshold', 'min_expiry_days_threshold'
         ] 
