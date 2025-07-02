@@ -7,13 +7,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db.models.signals import post_delete
 
 # Import all models
 from catalogs.models import Category, Product, ProductBatch
 from catalogs.validators import SKUValidator
 from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location, InventoryStock, InventoryMovement
-from sales.models import Customer, Sale, SaleItem
+from sales.models import Customer, Sale, SaleItem, Return, ReturnItem, update_inventory_on_return_item_delete, update_return_total
 from credits.models import CreditAccount, CreditPayment
 
 
@@ -29,8 +30,8 @@ class Command(BaseCommand):
         parser.add_argument(
             'csv_file',
             nargs='?',
-            default='UNIDENTAL - COMPRAS E INV.csv',
-            help='Ruta al archivo CSV (por defecto: UNIDENTAL - COMPRAS E INV.csv)'
+            default='UNIDENTAL - COMPRAS E INV (1).csv',
+            help='Ruta al archivo CSV (por defecto: UNIDENTAL - COMPRAS E INV (1).csv)'
         )
         parser.add_argument(
             '--clear-data',
@@ -55,6 +56,13 @@ class Command(BaseCommand):
 
     def __init__(self):
         super().__init__()
+        # Asegurar salida UTF-8 para evitar errores de consola en Windows
+        import sys
+        try:
+            if sys.stdout and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
         self.validator = SKUValidator()
         self.category_mapping = self._create_category_mapping()
         
@@ -221,36 +229,56 @@ class Command(BaseCommand):
         return None
 
     def _clean_price(self, price_str):
-        """
-        Limpia y convierte una cadena de precio a Decimal.
-        """
-        if not price_str or price_str.strip() == '':
+        """Limpia y convierte un precio con posibles separadores de miles/decimales a Decimal."""
+        if not price_str:
             return None
-        
-        # Remover caracteres no numéricos excepto puntos, comas y signos de dólar
-        cleaned = re.sub(r'[^\d.,\$]', '', str(price_str))
-        
-        # Remover signos de dólar
-        cleaned = cleaned.replace('$', '')
-        
-        # Convertir comas por puntos para decimales
-        if ',' in cleaned and '.' in cleaned:
-            # Si tiene ambos, asumir que la coma es separador de miles
-            cleaned = cleaned.replace(',', '')
-        elif ',' in cleaned:
-            # Si solo tiene coma, puede ser decimal (europeo) o miles
-            parts = cleaned.split(',')
-            if len(parts) == 2 and len(parts[1]) <= 2:
-                # Probablemente decimal
-                cleaned = cleaned.replace(',', '.')
-            else:
-                # Probablemente separador de miles
-                cleaned = cleaned.replace(',', '')
-        
-        try:
-            return Decimal(cleaned)
-        except (InvalidOperation, ValueError):
+
+        txt = str(price_str).strip()
+        if txt == '':
             return None
+
+        # Buscar patrones de precio usando regex - tomar el primero
+        price_patterns = [
+            r'\$?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)',  # Precio con separadores de miles
+            r'\$?(\d+(?:[.,]\d{2})?)',  # Precio simple con decimales opcionales
+            r'\$?(\d+)'  # Solo números
+        ]
+        
+        for pattern in price_patterns:
+            matches = re.findall(pattern, txt)
+            if matches:
+                # Tomar solo el primer precio encontrado
+                price_match = matches[0]
+                
+                # Limpiar el precio encontrado
+                clean_txt = price_match.strip()
+                
+                # Manejar separadores
+                if '.' in clean_txt and ',' in clean_txt:
+                    clean_txt = clean_txt.replace('.', '')
+                    clean_txt = clean_txt.replace(',', '.')
+                elif ',' in clean_txt and '.' not in clean_txt:
+                    parts = clean_txt.split(',')
+                    if len(parts[-1]) == 2:
+                        clean_txt = clean_txt.replace(',', '.')
+                    else:
+                        clean_txt = clean_txt.replace(',', '')
+                elif '.' in clean_txt and ',' not in clean_txt:
+                    parts = clean_txt.split('.')
+                    if len(parts[-1]) == 3 and len(parts) > 1:
+                        clean_txt = clean_txt.replace('.', '')
+
+                try:
+                    price = Decimal(clean_txt)
+                    # Validar que el precio no sea demasiado grande
+                    if price >= Decimal('10000000000'):  # 10^10 = límite máximo
+                        return None
+                    return price
+                except (InvalidOperation, ValueError):
+                    continue
+        
+        # Si no se encontró ningún patrón válido
+        return None
 
     def _clean_stock_quantity(self, stock_str):
         """
@@ -337,25 +365,35 @@ class Command(BaseCommand):
         """
         self.stdout.write("🗑️  Limpiando base de datos...")
         
-        # Eliminar en orden inverso a las dependencias
-        CreditPayment.objects.all().delete()
-        CreditAccount.objects.all().delete()
-        SaleItem.objects.all().delete()
-        Sale.objects.all().delete()
-        Customer.objects.all().delete()
-        
-        InventoryMovement.objects.all().delete()
-        InventoryStock.objects.all().delete()
-        
-        from purchases.models import PurchaseOrderItem, PurchaseOrder
-        PurchaseOrderItem.objects.all().delete()
-        PurchaseOrder.objects.all().delete()
-        
-        PurchaseOption.objects.all().delete()
-        Product.objects.all().delete()
-        Category.objects.all().delete()
-        Supplier.objects.all().delete()
-        Location.objects.all().delete()
+        # Desactivar señales que manipulan inventario durante la eliminación
+        post_delete.disconnect(update_inventory_on_return_item_delete, sender=ReturnItem)
+        post_delete.disconnect(update_return_total, sender=ReturnItem)
+        try:
+            ReturnItem.objects.all().delete()
+            Return.objects.all().delete()
+
+            CreditPayment.objects.all().delete()
+            CreditAccount.objects.all().delete()
+
+            SaleItem.objects.all().delete()
+            Sale.objects.all().delete()
+            Customer.objects.all().delete()
+
+            InventoryMovement.objects.all().delete()
+            InventoryStock.objects.all().delete()
+
+            from purchases.models import PurchaseOrderItem, PurchaseOrder
+            PurchaseOrderItem.objects.all().delete()
+            PurchaseOrder.objects.all().delete()
+
+            PurchaseOption.objects.all().delete()
+            Product.objects.all().delete()
+            Category.objects.all().delete()
+            Supplier.objects.all().delete()
+            Location.objects.all().delete()
+        finally:
+            post_delete.connect(update_inventory_on_return_item_delete, sender=ReturnItem)
+            post_delete.connect(update_return_total, sender=ReturnItem)
         
         self.stdout.write("✅ Base de datos limpiada")
 
@@ -416,6 +454,12 @@ class Command(BaseCommand):
         if not product_name or product_name.startswith('NO USAR') or product_name == 'referencias':
             return None
         
+        # Ajustar índices para nuevo CSV: se añadieron columnas vacías entre referencias y datos clave
+        # Estructura relevante (0-based):
+        # 0: nombre, 1: referencias, 2-5: vacías, 6: proveedor,
+        # 7: inventario sur, 8: inventario norte, 9: fecha vencimiento, 10: precio compra,
+        # 11: precio venta
+
         referencias = row[1].strip() if len(row) > 1 else ''
         proveedor = row[6].strip() if len(row) > 6 else ''
         inventario_sur = row[7].strip() if len(row) > 7 else ''
@@ -446,12 +490,12 @@ class Command(BaseCommand):
         
         # Crear descripción
         description_parts = []
-        if referencias:
-            description_parts.append(f"Referencias: {referencias}")
+        if referencias and referencias.lower() != 'referencias':
+            description_parts.append(referencias)
         if proveedor:
             description_parts.append(f"Proveedor: {proveedor}")
         
-        description = '. '.join(description_parts) if description_parts else product_name
+        description = '. '.join(description_parts) if description_parts else ""
         
         return {
             'name': product_name,
@@ -603,7 +647,8 @@ class Command(BaseCommand):
                                     'description': data['description'],
                                     'unit': data['unit'],
                                     'category': category,
-                                    'requires_batch_control': requires_batch
+                                    'requires_batch_control': requires_batch,
+                                    'sale_price': data['precio_venta']
                                 }
                                 
                                 # Usamos update_or_create para manejar el caso donde el producto
