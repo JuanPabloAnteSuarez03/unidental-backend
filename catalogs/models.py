@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from .validators import validate_sku
 
 # Create your models here.
@@ -112,6 +113,15 @@ class Product(models.Model):
         blank=True,
         verbose_name="Umbral Mínimo de Días de Vencimiento",
         help_text="Número mínimo de días antes del vencimiento para que un lote sea considerado aceptable."
+    )
+    sale_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Precio de venta",
+        help_text="Precio de lista o PVP recomendado"
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
