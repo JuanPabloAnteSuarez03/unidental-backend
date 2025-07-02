@@ -1,4 +1,4 @@
-"NO USAR ESTE DRIVE, SI NECESITA ALGO HAGA UNA COPIA, use solo para hacer cambios",referencias ,,,PEDIDO SUR ,PEDIDO NORTE,PROVEEDOR,INVENT SUR mar 21,INVENT NTE ,FECHA VCMTO,PRECIO COMPRA,     precio venta ,IVA,PRECIO MALTERO,%,VR PEDIDO 
+OJO NO USAR ESTE,referencias ,,,PEDIDO SUR ,PEDIDO NORTE,,INVENT SUR mar 21,INVENT NTE ,FECHA VCMTO,PRECIO COMPRA,     precio venta ,IVA,PRECIO MALTERO,%,VR PEDIDO 
 abre bocas Umbrella,,,,0,0,Pluss Dent GAB VEL,0,0,,$11.053,$15.000,,,"0,36",$0
 Abreboca  manual gancho DOBLE EXTREMO NEGRO,,,,0,0,IMPORTADA,,8,, $8.746,$30.000,19,,"2,43",$0
 Abreboca  manual gancho DOBLE EXTREMO TRANSPARENTE,,,,0,0,IMPORTADA,,50,,$3.924,$30.000,,,"6,65",$0
@@ -7,18 +7,18 @@ Abreboca AZUL Y ROJO AMARILLO,,,,0,0,ELVER LOZANO BOGOTA,,rojo 1 azul 1,,$4.500,
 abreboca Con retractor adulto   ,,,,0,0,UPEGUI ,,BLANCO 43 NEGRO 10,,$16.900,$24.000,,,"0,42",$0
 abreboca Con retractor PEDIATRICO ,,,,0,0,UPEGUI,,20,,$16.900,$24.000,,,"0,42",$0
 Abreboca manual gancho GRANDE,,,,0,0,IMPORTADA,,50,, $1.427,$10.000,,,"6,01",$0
-Abreboca sencillo adulto ,OXXI $ 11067 NISSI $7556,,,0,0,OXXI NISSI,,88,,$2.213,$8.000,,,"2,61",$0
-Abreboca sencillo niño,OXXI $ 11067 NISSI $7557,,,0,0,OXXI NISSI,,26,,$2.213,$8.000,,,"2,61",$0
+Abreboca sencillo adulto ,OXXI $ 11067 NISSI $7556,,,20,20,OXXI NISSI,,88,,$2.213,$8.000,,,"2,61",$44.268
+Abreboca sencillo niño,OXXI $ 11067 NISSI $7557,,,10,0,OXXI NISSI,,26,,$2.213,$8.000,,,"2,61",$0
 abreboca sin retractor ,,,,0,0,UPEGUI,,10,,$16.900,$24.000,,,"0,42",$0
 abrebocas aclaramiento tipo optragate,,,,0,0,IMPORTADA,,58,,$4.602,$12.000,,,"1,61",$0
 Accufilm Papel de articular  aqua film x 280 tiras,,,,0,0,La muela miguel,,1,,$325,$800,,,"1,46",$0
 Accufilm Papel de articular CIRENE aqua film x 280 tiras,,,,0,0,La muela miguel,,,,$65.000,$105.000,,$90.000,"0,62",$0
 Aceite 3 en 1 ,,,,0,,CENTRO HOYOSTOOL,,,,$3.808,$6.000,,,"0,58",$0
-aceite lubricante - pieza de mano Dental handpiece 300ml,,,,0,0,dentmark,,0,,$28.000,$48.000,,$38.000,"0,71",
-aceite lubricante - pieza de mano Dental handpiece 550ml,,,,0,0,dentmark,,0,,$35.000,$54.000,,$44.000,"0,54",
+aceite lubricante - pieza de mano Dental handpiece 300ml,,,,0,0,DTM,,,,$28.000,$48.000,,$38.000,"0,71",
+aceite lubricante - pieza de mano Dental handpiece 550ml,,,,0,0,DTM,,,,$35.000,$54.000,,$44.000,"0,54",
 aceite lubricante - pieza de mano PANASPRAY PLUS NSK 480ML,NSK,,,0,0,LA MUELA,,10,03-2025,$145.000,$178.000,,$168.000,"0,23",$0
 aceite lubricante - pieza de mano WYH 400ML ,euro $96250,,,,,MASDENTAL EURODENT,,0,,$116.000,$145.000,,$120.000,"0,25",$0
-Aceite lubricante Bendechk 300ml,,,,0,0,makrodent dentmart,,0,,$35.000,$48.000,,,"0,37",$0
+Aceite lubricante Bendechk 300ml,,,,0,0,makrodent DTM,,,,$35.000,$48.000,,,"0,37",$0
 aceite lubricante de piezas digixpray 240ml,,,,0,0,muela,,,,$24.850,$48.000,iva ,$34.000,,
 Aceite lubricante en Spray 200 ml- KAVO,,AGOTADO,,0,0,Pluss Dent GAB VEL,0,0,,$49.504,$65.000,,,"0,31",$0
 aceite lubricante pequeño - pieza de mano 50 ml,,,,0,,RAMON,,,,$7.400,$12.000,,,"0,62",$0
@@ -36,7 +36,7 @@ acido desmineralizante 37% fosforico MAQUIRA 2.5,ACIDO,PRECIO MAYO 20,2578,0,0,R
 acido desmineralizante angelus 3 grs,ACIDO,,,0,0,CLAUDIA,,0,,$2.000,$10.000,,,"4,00",$0
 Acido desmineralizante FGM condac 12.5 ML,ACIDO promo antoq $24375 SOCCIDEN 20825 plus20000,,,0,0,FGM soccident,,0,12-2025,$26.000,$35.000,exc,,"0,35",$0
 Acido Desmineralizante proquident 10ML  jumbo,ACIDO,,,,,PROQUIDENT,,2,04-2028,$14.173,$24.000,,,"0,69",#REF!
-Acido Desmineralizante Select H V ETCH 5ML Bisco ,promo $32400,,,0,0,JULVIDENT bisco,,11,03-2027,$54.000,$68.000,EXC,,"0,26",$0
+Acido Desmineralizante Select H V ETCH 5ML Bisco ,promo $48.450 mayo/25,,,,,JULVIDENT bisco,,11,03-2027,$54.000,$68.000,EXC,,"0,26",$0
 Acido desmineralizante SUPER ETCH SDI 12 gm,ACIDO,,,0,0,ABRAHAM,,6,10-2026,$33.800,$42.500,exc,,"0,26",$0
 Acido desmineralizante ultra ETCH 30ml ultradent,ACIDO,,,0,0,Gabriel Vel pluss ,1,3,,$150.579,$210.000,,"tempo $150,000","0,39",$0
 Acido Desmineralizante Zafira 10 ml,ACIDO,kit zafira ,,,,New Stetic,10,,revisar,$12.400,$18.000,exc,$15.000,"0,45",$0
@@ -48,10 +48,10 @@ acido fluorhidrico 5% porcelana jeringa 2.5 ml FGM,SOCCID $24514 plus $25600,,,0
 ACIDO FLUORHIDRICO 7ML (GOTERO) prodont ,,,,0,10,PRODONT,,4,07-2027,$30.651,$45.000,,$38.000,"0,47",$306.508
 acido fluorhidrico 9.6% Jeringa 2 g Eufar,Aquiles $32000 ramon $32000 EUFAR $29354,,,0,0,AQUILES RAMON GABRIEL VELASQUEZ Eufar ,,,,$29.354,$45.000,,$35.000,"0,53",$0
 Acido fluorhidrico grabador para porcelana ultradent,pluss $24804,,,0,0,Gabriel Vel pluss ,3,6,,$30.257,$52.000,EXC,$38.000,"0,72",$0
-"Acido Fluorhidrico porcelain etch 9,5% Bisco ",promo $70800,,,0,0,JULVIDENT bisco,,3,,$118.000,$170.000,EXC,,"0,44",$0
+"Acido Fluorhidrico porcelain etch 9,5% Bisco ",promo $106.250 mayo/25,,,,,JULVIDENT bisco,,3,,$118.000,$170.000,EXC,,"0,44",$0
 aclaramiento casero Clariant 16% Angelus ,,,,0,0,ABRAHAM,,3,,$19.710,$24.630,,,"0,25",$0
 Aclaramiento casero OPALECENSE  x 2 JERINGAS ,,Casero,,0,0,CLAUDIA pluss dent,3,4,revisar,$45.031,$58.000,iva,,"0,29",$0
-Aclaramiento casero Opalecense Go caja x 10,pluss $211.000 promo 2x 159 gabriel velasq promo x 2 155,Casero ,,1,0,CLAUDIA pluss dent ,1,2,10-2025,$211.194,$250.000,,,"0,18",$0
+Aclaramiento casero Opalecense Go caja x 10,pluss $211.000 promo 2x 159 gabriel velasq promo x 2 155,Casero ,,1,0,CLAUDIA pluss dent ,1,2,10-2025,$211.194,$248.000,,,"0,17",$0
 Aclaramiento casero Opalecense Go x unidad,,Casero ,,0,0,CLAUDIA pluss dent,0,,,$25.000,$30.000,,,"0,20",$0
 Aclaramiento casero Polanight ,,,,0,0,CLAUDIA abraham,,0,,$26.900,$33.600,,,"0,25",$0
 Aclaramiento casero Potenza 16% ,,Casero ,,,,New Stetic,0,,04-2026,$13.953,$22.000,,,"0,58",$0
@@ -147,7 +147,7 @@ Adhesivo optibond KERR,,,,0,0,Pluss Dent GAB VEL,0,0,,$144.700,$180.000,,,"0,24"
 Adhesivo optibond KERR UNIVERSAL,,,,0,0,Pluss Dent GAB VEL,0,0,,$280.000,$364.000,,,"0,30",$0
 Adhesivo OptiBond S Kerr 6ML,,,,0,0,MASDENTAL  PLUSSDENT,0,0,,$103.000,$127.000,,,"0,23",$0
 Adhesivo OptiBond S Kerr 6ML,,,,0,0,MASDENTAL  PLUSSDENT,0,0,,$103.400,$138.000,,,"0,33",$0
-Adhesivo palfique bond tokuyama 5ml,,,,0,0,julvipdent,,1,,,,,,,
+Adhesivo palfique bond tokuyama 5ml,,,,,,julvipdent,,1,,,,,,,
 ADHESIVO PARA IMPRESION CUBETA ZHERMACK (ojo fecha vencimiento lejana),euro $46565,,,,,RAMON-gabriel velasquez masdental EURODENT,,,,$48.897,$69.000,,$58.000,"0,41",$0
 ADHESIVO PARA IMPRESION CUBETA ZHERMACK porcion,,,,,,RAMON-gabriel velasquez masdental EURODENT,,,,$3.450,$4.000,,,"0,16",$0
 ADHESIVO PEAK UNIVERSAL 4ML,,,,0,0,GABRIEL VELASQUEZ PLUSS DENT,0,0,,$102.401,$140.000,EXC,,"0,37",$0
@@ -204,8 +204,8 @@ alginato premiun coltene libra,,,,0,0,GABRIEL VELASQUEZ,,0,,$2.000,$4.000,,,"1,0
 Alginato tropicalgin zhermack X 453grs,Dora $34800 masdental $36900,Alginato ,,,,DORA - RAMON EURODENT,,,04-2029,$34.800,$42.000,,,"0,21",$0
 Algodon paquete  Trenzado,compre $20,,,,,New Stetic,0,20,08-2029,$23.000,$34.000,exc,$28.000,"0,48",$0
 Algodon paquete Aglutinado (no trenzado) Higietex ,,,,,,New Stetic ,0,26,05-2029,$25.850,$34.000,EXC,$28.000,"0,32",$0
-All Bond Adhesivo Universal Bisco ,promo $190800,u,,0,0,JULVIDENT bisco,,25,01-2026,$318.000,$380.000,EXC,,"0,19",$0
-All Bond Adhesivo Universal Bisco UNIDOSIS,,,,0,0,JULVIDENT bisco,,0,,$9.060,$15.000,,,"0,66",$0
+All Bond Adhesivo Universal Bisco ,promo $287.300 mayo/25,u,,,,JULVIDENT bisco,,25,01-2026,$318.000,$380.000,EXC,,"0,19",$0
+All Bond Adhesivo Universal Bisco UNIDOSIS,,,,,,JULVIDENT bisco,,0,,$9.060,$15.000,,,"0,66",$0
 ALLCEM CORE A1  PEAR CORPO DUPLO FGM,antioq $108000 soccid $100000,,,0,0,FGM soccident,,,,$100.000,$140.000,exc,$140.000,"0,40",$0
 ALLCEM CORE A2  PEAR CORPO DUPLO FGM,antioq $108000 soccid $100000 ,,,0,0,FGM soccident,,,,$100.000,$140.000,exc,$140.000,"0,40",$0
 ALLCEM CORE VENEER APS OW  FGM,,,FGM,0,0,FGM soccident,,,,$160.000,$230.000,,,"0,44",$0
@@ -215,11 +215,11 @@ AMALGAMA  1 PORC  NUALLOY ,,,,,,NEW STETIC,0,,,$1.800,$3.000,,,"0,67",$0
 anestesia  TOPICA GAROCAINA ,,,,0,0,nuria,,0,,$8.900,$14.000,,,"0,57",$0
 ANESTESIA Artheek   articaina blister x10,blister x 10,,,,,New Stetic,0,,06-2026,$16.400,$18.000,exc,,"0,10",$0
 ANESTESIA Artheek  4% E - 100 articaina,caja x 50,"$16.400,00",,,,New Stetic,0,9,06-2026,$68.300,$82.000,exc,$75.000,"0,20",$0
-ANESTESIA New caina anestesia 2 % E - 80,caja x 50,,,,,New Stetic,0,39,08-2026,$52.100,$63.000,exc,$57.000,"0,21",$0
-ANESTESIA New caina anestesia 2 % E - 80 blister x10,blister x 10,,,,,New Stetic,0,,08-2026,$12.600,$15.000,exc,,"0,19",$0
-ANESTESIA New caina anestesia 2 % E - 80 carpul de vidrio,caja x 50,,,,,New Stetic,0,,08-2026,$56.600,$63.000,exc,$57.000,"0,11",$0
-ANESTESIA New caina SIN EPINEFRINA caja Amarilla ,blister x 10,,,,,New Stetic,0,39,08-2026,$61.300,$72.000,exc,,"0,17",$0
-ANESTESIA New caina SIN EPINEFRINA caja Amarilla blister  X 10,caja x 50,,,,,New Stetic,0,39,08-2026,$14.400,$18.000,exc,,"0,25",$0
+ANESTESIA New caina anestesia 2 % E - 80,caja x 50,,,,,New Stetic,0,39,,$52.100,$63.000,exc,$57.000,"0,21",$0
+ANESTESIA New caina anestesia 2 % E - 80 carpul de vidrio,caja x 50,,,,,New Stetic,0,,,$52.100,$63.000,exc,$57.000,"0,21",$0
+ANESTESIA New caina con epinefrina blister x10,blister x 10,,,,,New Stetic,0,,,$12.600,$15.000,exc,,"0,19",$0
+ANESTESIA New caina SIN EPINEFRINA caja Amarilla ,blister x 10,,,,,New Stetic,0,39,,$61.300,$72.000,exc,,"0,17",$0
+ANESTESIA New caina SIN EPINEFRINA caja Amarilla blister  X 10,caja x 50,,,,,New Stetic,0,39,,$14.400,$18.000,exc,,"0,25",$0
 ANESTESIA Odontocaina anestesia 3% vidrio,caja x 50,,,,,New Stetic,0,4,05-2026,$63.000,$76.000,exc,$68.000,"0,21",$0
 ANESTESIA Odontocaina anestesia 3% vidrio blister x 10,blister x 10,,,,,New Stetic,0,,05-2026,$15.200,$18.000,exc,,"0,18",$0
 ANESTESIA SEPTODONT  1/100.000  TTO LARGOS,,,,0,0,ABRAHAM,,10,,$74.900,$85.000,exc,,"0,13",$0
@@ -241,7 +241,7 @@ ARCO ERICH (PARA MODELO) ,,,,0,,DAZA - ramon claudia,,,,$8.400,$18.000,exc,,"1,1
 Arco Niti rectangular paquete x10,abraham $6500 padilla $4700 ORTHO PROF $4500,,,0,0,Ivan Padilla,,0,,$6.500,$9.000,,,"0,38",$0
 Arco Niti redondo paquete x10,abraham $4500 padilla $2900 ORTHO PROF $2900,,,0,0,Ivan Padilla,,0,,$3.900,$9.000,,,"1,31",$0
 Aro para tarro guardian ,,,,0,0,ALLERS,,1,,$8.847,$14.000,,,"0,58",$0
-Articulador BIO-ART,,,,0,0,JULVIDENT BIOART,,9,,$850.000,$1.300.000,,$1.150.000,"0,53",$0
+Articulador BIO-ART,promo $980.000 mayo/25,,,,990630,JULVIDENT BIOART,,9,,$980.000,$1.300.000,,$1.150.000,"0,33",$970.817.400.000
 ARTICULADOR de bisagra  bronce dorado,,,,0,0,AQUILES / monica - Sneider,,,,$39.270,$48.000,,,"0,22",$0
 ARTICULADOR de bisagra  cromado gris,245021,,,0,0,AQUILES / monica - jorge masterdent,,,,$19.040,$32.000,,,"0,68",$0
 ARTICULADOR MAGNETICO,245022,,,0,0,Masterdent,,0,,$62.475,$95.000,,,"0,52",$0
@@ -299,7 +299,7 @@ Bio c repair,,,,1,,ABRAHAM,,,,$300.380,$375.500,,,,
 Bio c sealer,,,,5,0,ABRAHAM dora,,2,,$91.700,$114.700,EXC,,"0,25",$0
 Bio c temp,,,,0,0,ABRAHAM dora,,0,,$79.000,$98.750,EXC,,"0,25",$0
 Biodentine Septodont,B34362,PRECIO 20 MAYO,60432,0,0,ABRAHAM,,20,,$57.410,$72.000,0,$62.000,"0,25",$0
-Bis silane bisco silano ,promo $134400,,,0,0,JULVIDENT bisco,,3,,$224.000,$290.000,,,"0,29",$0
+Bis silane bisco silano ,promo $202300 mayo/25,,,,,JULVIDENT bisco,,3,,$224.000,$290.000,,,"0,29",$0
 Bisagra para modelo Ivorina ,,,,0,0,Aquiles,,0,,$2.400,$4.500,,,"0,88",$0
 BOLSA BCA T 15 = ,ok,,,0,,CENTRO - Fercho,,,,$27,$500,,,"17,73",$0
 BOLSA BCA T 25,ok,,,0,,CENTRO - Fercho,,,,$57,$500,,,"7,77",$0
@@ -313,7 +313,7 @@ BOLSA HERMETICA ZIPLOC 20 x 24 para modelos ,,,no traer mas ,0,0,CENTRO - Fercho
 BOLSA HERMETICA ZIPLOC 25 x 30 GRANDE alambre,,,no traer mas ,0,0,CENTRO - Fercho,0,0,,$100,$500,,,"4,00",$0
 BOLSA HERMETICA ZIPLOC 5 x 5 profilaxis y empacar,ok,,,0,0,CENTRO - Fercho,0,0,,$28,$100,,,"2,57",$0
 BOLSA HERMETICA ZIPLOC 6 x 10 cm bicarbonato y LLAVES,ok,,,0,0,CENTRO - Fercho,0,0,,$39,$200,,,"4,13",$0
-bolsa para esterilizar  # 1 = 6 Cm x 13 Cm LIMAS,dentmar $6.500 imporq $6.000,,,0,,imporq dentmart,,,10-2027,$6.500,$20.000,,,"2,08",$0
+bolsa para esterilizar  # 1 = 6 Cm x 13 Cm LIMAS,dentmar $6.500 imporq $6.000,,,0,0,imporq DTM,,,10-2027,$6.500,$20.000,,,"2,08",$0
 bolsa para esterilizar  # 2 = 9 Cm x 13 Cm GRAPAS,,,,0,,DAZA Ramon imporq GABRIEL V,,,10-2027,$10.500,$22.000,,$18.000,"1,10",$0
 Bolsa para esterilizar # 3 =  9 x 26 cm BASICO,"imporq$16,000 / Dentmar $16,300 ",,,0,,DAZA Ramon imporq GABRIEL V,,,,$16.000,$32.000,,$28.000,"1,00",$0
 Bolsa para esterilizar # 4 =13 x 28 cm CUBETAS 1/2na ,denmart $25.000 imporq $25.000,,,0,,DAZA Ramon imporq GABRIEL V,,,,$32.000,$48.000,,$42.000,"0,50",$0
@@ -334,7 +334,7 @@ Caja acero CON HUECOS acanalada con tapa Peq. 16x25,,,,3,0,aquiles,,1,,$34.272,$
 caja acero inox para instrumental Grande CON HUECOS 21x30x6,agotada,,,0,1,aquiles,,0,,$40.698,$60.000,,,"0,47",$40.698
 Caja Algodonera  PLASTICA COLOR,,,,0,0,UPEGUI,,0,,$3.500,$6.000,,,"0,71",$0
 Caja Algodonera ALUMINIO Doble,,,,0,0,aquiles,,0,,$6.545,$10.000,,,"0,53",$0
-Caja Algodonera metalica ALUMINIO,,,,0,,aquiles ramon,,,$6.426,$6.426,$10.000,,,"0,56",$0
+Caja Algodonera metalica ALUMINIO,,,,0,,aquiles ramon,,,$6.426,$6.426,$10.000,,$9.000,"0,56",$0
 CAJA DE ESTERILIZAR METALICA BASICO PEQUEÑA,,,,0,0,,,9,,,,,,,
 Caja kendyLock No. 2 Medio/ref 60050,,,,,,CENTRO- LA 15 - la mejor guillermo velez,,,,$3.500,$6.000,,,"0,71",$0
 Caja kendyware rectangular No.3 BAJA 2.5LTS,,,,,,CENTRO- LA 15 - la mejor guillermo velez,,,,$4.900,$7.000,,,"0,43",$0
@@ -352,12 +352,12 @@ CAJA PLASTICA TAPER hermetico lujo No. 3,,,,20,30,PERSAL CENTRO- LA 15- la 13 ,0
 CAJA PLASTICA TAPER hermetico lujo No. 4,,,,10,20,PERSAL CENTRO- LA 15- la 13 ,7,8,,$12.733,$21.000,,,"0,65",$254.660
 CAJA RETENEDORA GRANDE  a granel,oxxi $1440 zen dent $1226,,,0,0,Dentoline,,morado rojo negro azu verde,,1083,$2.000,,,"0,85",$0
 CAJA RETENEDORA GRANDE  X 36,ortho prof $1285,,,0,0,OXXI,,86,,$1.285,$2.000,,,"0,56",$0
-CAJA RETENEDORA PEQUEÑA  X 48,oxxi $1220 orhto prof $1071,,,0,0,OXXI,,12 rosada verde azul,,$1.071,$2.000,,,"0,87",$0
+CAJA RETENEDORA PEQUEÑA ,oxxi $1220 orhto prof $1071,,,100,200,OXXI,,12 rosada verde azul,,$1.071,$2.000,,,"0,87",$214.200
 Caja salento #1 pequeña  10 LTS kendy,gulle $9783,,,,0,CENTRO- LA 15 - la mejor guillermo velez,,12,,$9.782,$18.000,,,"0,84",$0
 Caja salento #2 mediana   10 LTS kendy,,,,,0,CENTRO- LA 15 - la mejor guillermo velez,,36,,$12.515,$24.000,,,"0,92",$0
 Caja salento #3 grande  17 LT kendy,guille $17100,,,,0,CENTRO- LA 15 - la mejor guillermo velez,,30,,$17.118,$32.000,,,"0,87",$0
 CAJAS TRANSPARENTES PARA ENDOKIT ,,BORRAR,,0,,Dentsplay Ramon ,,,,$1,$1,,,N/V,
-CALCIFAR - P JERINGA 2ML (Hidroxido de calcio en pasta),,,,0,0,eufar,,,,$25.935,$36.000,,$29.000,"0,39",
+CALCIFAR - P JERINGA 2ML Hidroxido de calcio en pasta,,,,0,0,eufar,,,,$25.935,$36.000,,$29.000,"0,39",
 Calibrador Inter oclusal ,,,,0,0,scoes,,12,,$23.000,$50.000,,,"1,17",$0
 CAMBIA FRESA ,IMPORTADO $5517,,,0,,RAMON- DENTAL LA U IMPORTADO,,,,$15.000,$25.000,,$20.000,"0,67",$0
 camisa Azul de boton   talla M,,,,0,0,BIOSALUD,,revisar,,$4.000,$8.000,,,"1,00",$0
@@ -415,8 +415,8 @@ CEPILLO PELO CABRA CERDA BLANCA  PARA BRILLAR METAL  ,241026,w,,0,0,Masterdent,,
 CEPILLO PELO DE CABRA PEQUENO PARA CONTRA ANGULO,IMPORTADO 1433,,,0,0,Abraham IMPORTADO,,40,,$11.213,$14.000,,,"0,25",$0
 cepillo torno PASTA gris grande,,,,0,0,aquiles ,,0,,$3.900,$7.000,,,"0,79",$0
 CEPILLOS CUERPO DE MADERA B23,,,,0,0,Masterdent,,8,,$7.485,$10.000,,,"0,34",$0
-Cepillos profilacticos  X 144,AQULIES $42 - Ramon  42 - dent $32 ,,,0,,aquiles - ramon - dentmart imporq,,,,$42.000,$52.000,,$42.000,"0,24",$0
-cepillos profilaxis X unidad,,,,0,,aquiles - ramon - dentmart imporq,,,,$256,$500,,,"0,95",$0
+Cepillos profilacticos  X 144,AQULIES $42 - Ramon  42 - dent $32 DORA 30,,,10,0,aquiles - ramon - DTM imporq,,,,$42.000,$52.000,,$42.000,"0,24",$0
+cepillos profilaxis X unidad,,,,0,0,aquiles - ramon - DTM imporq,,,,$256,$500,,,"0,95",$0
 Cera azul WHIPMIX PAQUETE X 20 BARRAS VTA UNIDAD,,,,1,0,Biodentales ,,,,$1.366,$2.000,,,"0,46",$0
 Cera base UNIDAD,,,,0,0,BONDENT,,,,$511,$1.000,,,"0,96",$0
 Cera base x 18 laminas rosada X CAJA ,,,,0,0,BONDENT,,,,$9.200,$15.000,,$12.000,"0,63",$0
@@ -434,6 +434,9 @@ cera metalizada x unidad BONDENT,,,,0,0,BONDENT,,,,$1.222,$2.000,,,"0,64",$0
 Cera para rodete LARGO x 18 Barras BONDENT,,,,0,0,BONDENT,,,06-2028,$14.800,$20.000,,$18.000,"0,35",$0
 Cera para rodete LARGO x 18 Barras BONDENT X UNIDAD,,,,0,0,BONDENT,,,,$883,$2.000,,,"1,27",$0
 Cera pegajosa pqte x 120 color naranja(rojisa) BONDENT,,,,0,0,BONDENT,,,,$900,$2.000,,,"1,22",$0
+CERA RENFER GEO CLASIC INDIVIDUAL GRANDE,,,,,,EURODENT,,,,$112.000,$148.000,,$120.000,,
+CERA RENFER GEO CLASIC X EXAGONAL X 6,,,,,,EURODENT,,,,$200.000,$290.000,,$225.000,,
+CERA RENFER GEO CLASIC X EXAGONAL X UNIDAD,,,,,,EURODENT,,,,$33.333,$60.000,,,,
 Cera Rodetes preformado en U caja x 30 unidades BONDENT ,,,,0,0,BONDENT,,,,$893,$2.000,,,"1,24",$0
 Cera rojo WHIPMIX PAQUETE X 20 BARRAS VTA UNIDAD,,,,0,0,Biodentales ,,,,$1.366,$2.000,,,"0,46",$0
 cera Utility caja x 75 Tiras x 28cm BONDENT,,,,0,0,BONDENT,,,,$24.100,$36.000,,,"0,49",$0
@@ -441,14 +444,14 @@ Cera Utility x unidad BONDENT.,,,,0,0,BONDENT,,,,$480,$1.000,,,"1,08",$0
 Cera verde WHIPMIX PAQUETE X 20 BARRAS VTA UNIDAD,,,,1,0,Biodentales ,,,12-2027,$1.366,$2.000,,,"0,46",$0
 cerafina x 60,,,,0,,monica - ramon biodentales,,,12-2025,$5.430,$8.000,,,"0,47",$0
 cerafina x 90,,,,0,,monica - ramon biodentales,,,,$9.136,$12.000,,,"0,31",$0
-choise 2 cemento CARILLAS resinoso Milky bisco,masdental $158900 promo $96000,promo $169,,0,0,JULVIDENT bisco ,,19,03-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
-choise 2 cemento CARILLAS resinoso Milky Opaque bisco,masdental $158900 promo $96000,,,0,0,JULVIDENT bisco ,,5,04-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
-choise 2 cemento resinoso  A1,masdental $158900 promo $96000,,,0,0,JULVIDENT bisco ,,1,01-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
-choise 2 cemento resinoso CARILLAS Traslucido bisco,masdental $158900 promo $96000,promo $169,,0,0,JULVIDENT bisco ,,11,12-2026,$160.000,$210.000,EXC,$190.000,"0,31",$0
-CHOISE Try-in paste A1 2g bisco Probador,,,,0,0,JULVIDENT bisco ,,0,,$86.000,$105.000,EXC,,"0,22",$0
-CHOISE Try-in paste Milky Bright 2g bisco Probador,,promo $85,,0,0,JULVIDENT bisco ,,0,03-2026,$86.000,$105.000,EXC,,"0,22",$0
-CHOISE Try-in paste OPAQUE 2g bisco Probador,,promo $85,,0,0,JULVIDENT bisco ,,1,7-2025,$86.000,$105.000,EXC,,"0,22",$0
-CHOISE Try-in paste TRASLUCIDO 2g bisco Probador,,promo $85,,0,0,JULVIDENT bisco ,,3,06-2025,$86.000,$105.000,EXC,,"0,22",$0
+choise 2 cemento CARILLAS resinoso Milky bisco, julvip promo $136.000 mayo 2025,promo $169,,,,JULVIDENT bisco ,,19,03-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
+choise 2 cemento CARILLAS resinoso Milky Opaque bisco, julvip promo $136.000 mayo 2025,,,,,JULVIDENT bisco ,,5,04-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
+choise 2 cemento resinoso  A1, julvip promo $136.000 mayo 2025,,,,,JULVIDENT bisco ,,1,01-2027,$160.000,$210.000,EXC,$190.000,"0,31",$0
+choise 2 cemento resinoso CARILLAS Traslucido bisco, julvip promo $136.000 mayo 2025,promo $169,,,,JULVIDENT bisco ,,11,12-2026,$160.000,$210.000,EXC,$190.000,"0,31",$0
+CHOISE Try-in paste A1 2g bisco Probador,,,,,,JULVIDENT bisco ,,0,,$86.000,$105.000,EXC,,"0,22",$0
+CHOISE Try-in paste Milky Bright 2g bisco Probador,,promo $85,,,,JULVIDENT bisco ,,0,03-2026,$86.000,$105.000,EXC,,"0,22",$0
+CHOISE Try-in paste OPAQUE 2g bisco Probador,,promo $85,,,,JULVIDENT bisco ,,1,7-2025,$86.000,$105.000,EXC,,"0,22",$0
+CHOISE Try-in paste TRASLUCIDO 2g bisco Probador,,promo $85,,,,JULVIDENT bisco ,,3,06-2025,$86.000,$105.000,EXC,,"0,22",$0
 Cinta de Profilaxis  TDV PAQUETE X 10,,,,2,0,ABRAHAM ,,1,02-2029,$46.320,$58.000,"1,19",$52.000,"0,25",$0
 Cinta de Profilaxis  TDV PAQUETE X unidad,,,,0,0,ABRAHAM ,,0,,$4.169,$7.000,,,"0,68",$0
 Cinta Esterilizar clase 5 caja roja  indicador imporquirurgica,,,,0,0,IMPORQ,,7,,$41.000,$70.000,,,"0,71",$0
@@ -586,16 +589,16 @@ Discos pulidores JIFFY ultradent Verde Lenteja ,,,,0,0,Gabriel Vel pluss ,7,0,,$
 Discos soflex 3M,,,pedir ,0,,RAMON GABRIEL VELASQUEZ,,,,$841,$30.000,,,"34,67",$0
 Discos soflex 3M PAQUETE X30,,,,0,,RAMON GABRIEL VELASQUEZ,,,,$71.400,$95.000,,,"0,33",$0
 Discos soflex praxis TDV x30,,,,0,0,ABRAHAM,,,,$39.730,$49.600,exc,,"0,25",$0
-Discos soflex super snap ,SSW $11800 // NEW $13566 // MIGUEL $11042,kit zafira,,,,jorge new stetic,0,,,$12.614,$18.000,,,"0,43",$0
+Discos soflex super snap ,SSW $11800 // NEW $13566 // MIGUEL $11042,kit zafira,,,,jorge new stetic,0,,,$12.614,$18.000,,$15.000,"0,43",$0
 Discos soflex super snap SHOFU NEGROS X CAJA ,,miguel $65 /New $74,,,,New Stetic MIGUEL,0,,,$74.732,$110.000,85,$85.000,"0,47",$0
 Discos soflex super snap X CAJA 48 UNIDADES,SSW $11800 // NEW $13566 // MIGUEL $11043,kit zafira,,,,jorge new stetic,0,,,$605.472,$720.000,,$14.375,"0,19",$0
 DISCOS ULTRA THIN VERDE PARA PORCELANA  ULTRATRIM,242010,,,0,0,Masterdent AQUILES,,30,,$1.000,$3.000,,,"2,00",$0
 Dispensador microaplicadores SDI,,,,0,0,CLAUDIA,,0,,$18.000,$40.000,,,"1,22",$0
-DUO LINK Bisco ,,promo $160,,0,0,JULVIDENT bisco,,20,26-2027,$267.000,$325.000,exc,$270.000,"0,22",$0
+DUO LINK Bisco ,,promo $160,,,,JULVIDENT bisco,,20,26-2027,$267.000,$325.000,exc,$270.000,"0,22",$0
 Duplicadora en hierro para laboratorio,,,,0,0,Monica sneider,,0,,$13.000,$24.000,,$18.000,"0,85",$0
 DURALAY DURACRYL FLOW 60 gr,,,,,,New Stetic ,0,3,,$141.253,$170.000,"1,19",$155.000,"0,20",$0
 DURALAY DURACRYL FLOW porcion 10gr,,,,0,0,unidental ,,,,$21.250,$30.000,,,"0,41",$0
-DURALAY Inlay Pattern Resin 20 grs,aquiles $33800 / ,,,0,0,JORGE,,4,,$30.000,$40.000,,$36.000,"0,33",$0
+DURALAY Inlay Pattern Resin 20 grs,aquiles $33800 / ,,,0,0,JORGE,,4,,$30.000,$40.000,,$38.000,"0,33",$0
 Dycal Ivory Shade  Dentsply,,AGOTADO,descontinuado,0,,Dentsplay Ramon ,,,,$46.500,$62.000,,,"0,33",$0
 ECO WIPES TOALLA CUADRA X50 HOJAS  WY PALL WYPALL ,,,,0,,CENTRO 40mil,,,,$25.000,$32.000,,,"0,28",$0
 EDTA  120 ml eufar,aquiles $40000 eufar $36985,,,0,0,Gabriel Velasquez - aquiles Eufar ,,1,,$36.985,$58.000,EXC,,"0,57",$0
@@ -654,12 +657,12 @@ Espejo facial  cuadrado colores ,,BORRAR,,0,,CENTRO 40mil,,,,$6.000,$6.000,,,"0,
 "Espejo facial  redondo colores rosa,morado,azul ",,,,0,,CENTRO 40mil,,,,$4.000,$8.000,,,"1,00",$0
 Espejo facial Gris  Trans,,,,0,,CENTRO,,,,$2.000,$10.000,,,"4,00",$0
 Espejo facial Muelita,,,,20,0,Aquiles,,10,,$11.900,$15.000,,,"0,26",$0
-Espejo juego para foto KIT X4,,,,0,0,IMPORTADA,,2,,$51.618,$100.000,,,"0,94",$0
+Espejo juego para foto KIT X4,,,,0,0,IMPORTADA,,2,,$51.618,$100.000,,$70.000,"0,94",$0
 Espejo juego para foto KIT X5,,,,0,0,IMPORTADA,,9,,$42.210,$120.000,,,"1,84",$0
-Espejo para foto muela Grande,,,pedir ,0,100,Bertulio,,30,,$2.200,$6.000,,,"1,73",$220.000
-Espejo para foto muela pequeño,,,,0,0,Bertulio,,140,,$2.200,$6.000,,,"1,73",$0
-Espejo para foto zapato Grande ,,,pedir ,0,50,Bertulio,,60,,$2.200,$6.000,,,"1,73",$110.000
-Espejo para foto zapato pequeño,,,,0,0,Bertulio,,100,,$2.200,$6.000,,,"1,73",$0
+Espejo para foto muela Grande,,,pedir ,0,100,Bertulio,,30,,$2.200,$6.000,,$4.000,"1,73",$220.000
+Espejo para foto muela pequeño,,,,0,0,Bertulio,,140,,$2.200,$6.000,,$4.000,"1,73",$0
+Espejo para foto zapato Grande ,,,pedir ,0,50,Bertulio,,60,,$2.200,$6.000,,$4.000,"1,73",$110.000
+Espejo para foto zapato pequeño,,,,0,0,Bertulio,,100,,$2.200,$6.000,,$4.000,"1,73",$0
 Espejo SOLO LUNA instrumental basico Delta,MIR5D16,BASICO,,0,,DELTA ,0,,,$22.551,$35.000,,,"0,55",$0
 espuma x metro,,,,0,,CENTRO WASHINGTON,,,,$400,$1.500,,,"2,75",$0
 ESTEMP NE spident tembond 2jeringas x 10gr,,,,0,0,SOCCIDENTALES,,0,,$56.320,$80.000,,,"0,42",$0
@@ -836,7 +839,7 @@ GORRO TIPO ORUGA AZUL PTE X 100,(ENE 25) imporquirugica $100 / new st $137 // bi
 gota reveladora ,,,pedir,0,20,gabriel vel,,8,05-2027,$6.188,$8.000,,,"0,29",$123.760
 GOTAS REVELADORAS DITONOS,"AQUILES $11,400",,,0,0,EUFAR,,0,,$12.337,$15.000,,,"0,22",
 gotero de 20cc para empacar #16 ,,,,0,,centro otorgo,,,,$240,$1.000,,,"3,17",$0
-GRAMERA DIGITAL,,BORRAR,,0,0,HOYOSTOOL,,,,,,,,,
+GRAMERA DIGITAL caja gris y negro ,,,,0,0,centro HOYOSTOOL,,,,,$45.000,,,,
 Grapa B4 - B 4 COLTENE,,,pedi nov 6,0,10,ULTRADENTAL,,2,,$53.550,$76.000,,,"0,42",$535.500
 Grapas  (hufriedy) ,,,,0,,Ramon,,,,$100.000,$145.000,,,"0,45",$0
 GRAPAS # 0,,,,0,0,IMPORTADA GRAPA ,,,,$3.016,$10.000,,,"2,32",$0
@@ -898,7 +901,7 @@ Hemostatico Cloruro de aluminio x 7ml hemodent prodont,,,,12,,RAMON PRODONT ,,,1
 "Hemostatico viscostat clear cloruro de aluminio jeringa transparente 1,2ml",GABRIEL VELASQ 16380,PRECIO 20 MAYO,17301,0,,Ramon Pluss Gab vel,4,,,$16.995,$26.000,,,"0,53",$0
 "Hemostatico viscostat sulfato ferrico jeringa cafe de 1,2ml ",,,,0,0,Gabriel Vel pluss ,1,5,,$14.500,$26.000,,,"0,79",$0
 Hexitec clorhexidinal clorexol,,,,0,12,nuria,,0,,$22.610,$28.000,,,"0,24",
-hidroxcal (hidroxido de calcio) FOTOCURADO 2gm,,,,0,0,SOCCIDENTALES CLAUDIA,,2,,$33.478,$48.000,,,"0,43",$0
+hidroxcal hidroxido de calcio FOTOCURADO 2gm,,,,0,0,SOCCIDENTALES CLAUDIA,,2,,$33.478,$48.000,,,"0,43",$0
 hidroxido de calcio KERR regular set life kikal dycal  ,29674,,,1,0,Pluss Dent GAB VEL,1,0,,$69.900,$89.000,,$79.000,"0,27",$0
 HIDROXIDO DE CALCIO X 10 gm prodont,,actualizar 4297,,0,0,RAMON-PROQUIDENT-PRODONT Aquiles Eufar,,,05-2027,$7.961,$8.000,,,"0,00",$0
 HIDROXIDO DE CALCIO X 7gm proquident ,,,,0,0,RAMON-PROQUIDENT-PRODONT Aquiles Eufar,,20,,$5.114,$8.000,EXC,,"0,56","0,00"
@@ -909,11 +912,11 @@ Hilo para sutura x yardas 4/0 (tarro) carrete 10 MT,aquiles 2998,,,0,,ramon Jorg
 hilo retractor  # 00 CON HEMOSTATICO PROQUIDENT,,,,,,PROQUIDENT,,0,06-2025,$11.000,$17.000,,,"0,55",$0
 Hilo retractor  00 no impregnado maquira,,,,0,0,SOCCIDENTALES CLAUDIA,,0,,$32.500,$50.000,,,"0,54",$0
 Hilo retractor  000 no impregnado maquira,,,,0,0,SOCCIDENTALES CLAUDIA,,0,,$32.500,$50.000,,,"0,54",$0
-hilo retractor  CON HEMOSTATICO # 1  Sure Cord,,,,0,0,JULVIDENT,,3,09-2025,$48.000,$64.000,,$54.000,"0,33",$0
-hilo retractor  CON HEMOSTATICO # 2  Sure Cord,,,,0,0,JULVIDENT,,4,,$48.000,$64.000,,$54.000,"0,33",$0
-hilo retractor #0 CON HEMOSTATICO  1/0 Sure Cord,,,,0,0,JULVIDENT,,6,11-2026,$48.000,$64.000,,$54.000,"0,33",$0
-hilo retractor 00 CON HEMOSTATICO 2 / 0 Sure Cord,,,,0,0,JULVIDENT,,40,11-2026,$48.000,$64.000,,$54.000,"0,33",$0
-hilo retractor 000 CON HEMOSTATICO 3 / 0 Sure Cord,,,,0,0,JULVIDENT,,45,1/9/2026 02-2027,$48.000,$64.000,,$54.000,"0,33",$0
+hilo retractor  CON HEMOSTATICO # 1  Sure Cord,,,,,,JULVIDENT,,3,09-2025,$48.000,$64.000,,$54.000,"0,33",$0
+hilo retractor  CON HEMOSTATICO # 2  Sure Cord,,,,,,JULVIDENT,,4,,$48.000,$64.000,,$54.000,"0,33",$0
+hilo retractor #0 CON HEMOSTATICO  1/0 Sure Cord,,,,,,JULVIDENT,,6,11-2026,$48.000,$64.000,,$54.000,"0,33",$0
+hilo retractor 00 CON HEMOSTATICO 2 / 0 Sure Cord,,,,,,JULVIDENT,,40,11-2026,$48.000,$64.000,,$54.000,"0,33",$0
+hilo retractor 000 CON HEMOSTATICO 3 / 0 Sure Cord,,,,,,JULVIDENT,,45,1/9/2026 02-2027,$48.000,$64.000,,$54.000,"0,33",$0
 Hilo retractor ultra pack # 0 por 244cm ,,,,0,0,Gabriel Vel pluss clau,1,3,,$54.613,$85.000,EXC,$62.000,"0,56",$0
 Hilo retractor ultra pack # 00 por 244cm ,,,,0,0,Gabriel Vel pluss clau,1,2,,$54.613,$85.000,exc,$62.000,"0,56",$0
 Hilo retractor ultra pack # 000 por 244cm ,,,,0,0,Gabriel Vel pluss clau,3,1,,$54.613,$85.000,EXC,$62.000,"0,56",$0
@@ -924,10 +927,10 @@ HIPOCLORITO AL 5 % X 120 ML ,PROQUID $3370 // PRODONT $5095,,,15,20,PRODONT ,,4,
 HIPOCLORITO AL 5 % X 120 ML ZONIDENT,PROQUID $4040 // PRODONT $4594,,,,,PROQUIDENT,,55,06-2026,$4.040,$8.000,exc,,"0,98",$0
 Hoja de Bisturi 15c  Braum unidad,,AGOTADO,,0,0,ALLERS,,0,,$775,$1.500,,,"0,94",$0
 HOJA DE SEGUETA SIERRAS 128mm NEY,,,,0,0,Masterdent AQUILES,,9,,$2.380,$4.000,,,"0,68",#REF!
-Hojas de bisturi # 11  x Caja,,,,0,0,abraham - IMPORQ Dentmart,,,04-2028,$25.000,$38.000,,$32.000,"0,52",$0
-Hojas de bisturi # 12  x Caja,,,,0,0,abraham - IMPORQ Dentmart,,,04-2028,$25.000,$38.000,,$32.000,"0,52",$0
-Hojas de bisturi # 15  x Caja,,,,0,10,abraham - IMPORQ Dentmart,,,12-2028,$25.000,$38.000,,$32.000,"0,52",$250.000
-Hojas de bisturi # 15 C  x Caja ECO,,,,0,6,abraham - IMPORQ Dentmart,,,12-2028,$25.000,$52.000,,$32.000,"1,08",$150.000
+Hojas de bisturi # 11  x Caja,,,,0,0,abraham - IMPORQ DTM,,,04-2028,$25.000,$38.000,,$32.000,"0,52",$0
+Hojas de bisturi # 12  x Caja,,,,0,0,abraham - IMPORQ DTM,,,04-2028,$25.000,$38.000,,$32.000,"0,52",$0
+Hojas de bisturi # 15  x Caja,,,,0,0,abraham - IMPORQ DTM,,,12-2028,$25.000,$38.000,,$32.000,"0,52",$0
+Hojas de bisturi # 15 C  x Caja ECO,,,,0,5,abraham - IMPORQ DTM,,,12-2028,$25.000,$52.000,,$32.000,"1,08",$125.000
 Hu Friedy CALIBRADOR DE CHU,HU FRIEDY,,,0,0,Daza - La Muela ABRAHAM,,,,$257.000,$340.000,,,"0,32",$0
 Hu Friedy Cucharilla Hu-Friedy instrumental ,HU FRIEDY daza $177072 abraham $98000,BA,,0,0,Daza - La Muela ABRAHAM,,,,$55.000,$90.000,,,"0,64",$0
 Hu-Friedy Cureta Gracey 1/2   instrumental ,HU FRIEDY,DAZA $138050,,0,0,Daza - La Muela ABRAHAM,,,,$138.050,$174.000,,,"0,26",$0
@@ -955,9 +958,9 @@ Hu-Friedy Pinza algodonera instrumental ,HU FRIEDY daza $84728 abraham $77000,BA
 Hu-Friedy Sonda Carolina Nte PCPUNC156 ,HU FRIEDY,,,0,0,Daza - La Muela ABRAHAM,,,,$107.900,$160.000,,,"0,48",$0
 Hu-Friedy Sonda de Nabers color instrumental ,HU FRIEDY,,,0,0,Daza - La Muela ABRAHAM,,,,$89.000,$140.000,,,"0,57",$0
 Hu-Friedy Sonda periodontal BASICO,HU FRIEDY,,,0,0,Daza - La Muela ABRAHAM,,,,$54.000,$90.000,,,"0,67",$0
-hydcal hidcal dycal cemento hidroxiod calcio pasta pasta ,,,,0,0,SOCCIDENTALES,,1,,$33.440,$48.000,,,"0,44",$0
+hydcal hidcal dycal cemento hidroxido calcio pasta pasta ,,,,0,0,SOCCIDENTALES,,1,,$33.440,$48.000,,$42.000,"0,44",$0
 indicador biologico BT20,,,,0,,integrom esteripac,,1,,6367,$12.000,,$10.000,"0,88",$0
-interlig,,,,0,0,abraham,,1,,$62.000,$110.000,,,,
+interlig,,,,,,abraham,,1,,$65.600,$110.000,,,,
 Ionomero base intermedia I LINER ,,,,0,0,Gabriel velasquez,,0,,$45.800,$60.000,,,"0,31",$0
 ionomero cementante IONGLASS C,COMPRE 49900,,No llego 14 AB,6,0,SOCCIDENTALES,,0,,$52.712,$72.000,EXC,$65.000,"0,37",$0
 Ionomero RIVA self cure SDI,,,,0,0,abraham ,,0,,$90.320,$112.000,,,"0,24",$0
@@ -1003,7 +1006,7 @@ KIT DE PUNTAS PARA PORCELANA,240043,,,0,0,Masterdent,,28,,$45.978,$70.000,,,"0,5
 KIT DE REPARACION ANGELUS OPACADOR + ACIDO + SILANO,,,,0,0,ABRAHAM,,0,,$112.000,$141.000,,,"0,26",$0
 KIT DE Resina FGM (adhesivo 4ml - 4 resinas  + Acido),,,,0,0,FGM soccident,,,,$202.000,$270.000,,,"0,34",$0
 KIT DE Resina FGM (adhesivo 6ml - 5 resinas  + con fluida y acido de maquira),,,,0,0,FGM soccident,,,,$190.000,$240.000,,,"0,26",$0
-kit disco soflex + mandril cuatro colores azul blanco,,,,0,0,importado,,3,, $21.865,$70.000,,,,
+kit disco soflex + mandril cuatro colores azul blanco,,,,0,0,importado,,3,, $21.865,$70.000,,$50.000,,
 KIT Discos soflex 3M 120 DISCOS + MANDRIL + 6 ESPIRALES ESSENCIAL,,,,0,0,GAB VEL  ,,0,,$364.000,$430.000,,$380.000,"0,18",$0
 KIT ESPATULAS PARA RESINA,,,,0,0,IMPORTADA,,7 azul 1 dorado,,$87.500,$240.000,,$190.000,"1,74",$0
 KIT ESPECIAL TDV FOTO KIT SURTIDO , ,,,2,0,ABRAHAM,,0,,$292.300,$365.000,,,"0,25",$0
@@ -1014,7 +1017,7 @@ KIT Estudiantil Silicona SPEEDEX COLTENE ,108048 x 30,,pedi nov 6,0,31,ULTRADENT
 KIT Fresas FG AZDENT,,,,0,0,IMPORTADA,,0,, $4.023,$50.000,,,"11,43",$0
 KIT Fresas para pulir Amarilla AZDENT,,,,0,0,IMPORTADA,,0,,$4.498,$50.000,,,"10,12",$0
 KIT Fresas para pulir ROJAS AZDENT,,,,0,,RAMON,,,,$4.498,$50.000,,,"10,12",$0
-kit GRANDE SILICONA PESADA 900GM  sola,masdental $584900,Silic KIT,,,,RAMON masdental EURODENT,,,,$520.000,$590.000,,$540.000,"0,13",$355.667.676.000
+kit GRANDE SILICONA PESADA ZHERMACK 900GM  sola,masdental $584900,Silic KIT,,,,RAMON masdental EURODENT,,,,$520.000,$590.000,,$540.000,"0,13",$355.667.676.000
 kit GRANDE SILICONA PESADA 900GM + 2  livianas ZHERMACK ,masdental $584899,Silic KIT,,precio,683976,RAMON masdental EURODENT,,,,$683.976,$780.000,,$720.000,"0,14",#REF!
 kit Grapa BRINKER COLTENE X6 SUBGINGIVAL,,,pedi nov 6,0,2,ultradental,,0,,$279.650,$380.000,,,"0,36",$559.300
 kit Grapa FIESTA COLTENE CON ALAS X 9,,,pedi nov 6,0,15,ultradental,,0,,$291.550,$380.000,,,"0,30",$4.373.250
@@ -1043,8 +1046,8 @@ KIT PUNTAS DE SILICONA PARA ACRILICO HP 0412,,,,0,0,IMPORTADO,,5,,$21.000,$54.00
 Kit Resinas estudiantil Zafira X 6 jeringas + acido 10ml + adhesivo 8ml,,,,,,New Stetic,0,,,,,,,,
 Kit Resinas estudiantil Zafira X 7 JERINGAS,,,,,,New Stetic,0,,,$400.000,$479.000,,,"0,20",$0
 Kit silicona Pesada + liviana  COLTENE president,,Silic KIT,,0,0,ULTRADENTAL ,,0,,$226.900,$290.000,,,"0,28",$0
-kit silicona pesada 400  y Liviana Panasil,,Silic KIT,,0,0,JULVIDENT panasil,,,$280,$271.000,$280.000,,$270.000,"0,03",$0
-kit silicona pesada 900  + 2 Livianas Panasil,,Silic KIT,,0,0,JULVIDENT panasil,,,,$522.720,$650.000,,,"0,24",$0
+kit silicona pesada 400  y Liviana Panasil,,Silic KIT,,,,JULVIDENT panasil,,,$280,$271.000,$280.000,,$270.000,"0,03",$0
+kit silicona pesada 900  + 2 Livianas Panasil,,Silic KIT,,,,JULVIDENT panasil,,,,$522.720,$650.000,,,"0,24",$0
 KIT T ECONOM A1 A2 A3 y B2 + adhesivo + acido,,,,0,4,masdental emma EURODENT,,,,$178.000,$230.000,,,"0,29",$712.000
 KIT TENSIOMETRO Y FONENDO DOBLE ,,,,0,0,AQUILES,,1,,$60.690,$75.000,,,"0,24","0,00"
 KIT TETRIC X 4 JERINGAS,,,,0,0,masdental emma EURODENT,,,,$417.000,$495.000,,,"0,19",$0
@@ -1077,6 +1080,8 @@ LENTULO # 40 X UNIDAD ,,,,0,,RAMON IMPORTADA,,,,$7.000,$10.000,,,"0,43",$0
 Lija  180 caja x 50,,,,,,CENTRO HOYOSTOOL,,,,$123,$500,,,"3,08",$0
 Lija  400 COD caja x 50,,,,,,CENTRO HOYOSTOOL,,,,$123,$500,,,"3,08",$0
 Lija de Papel COLORES EPITEX,,,,0,0,IMPORTADO,,VERDE  1 MORADA 4 AMARILLA 4,, $10.058,$48.000,,,,
+Lima hedstroem primera serie 25mm,,,,0,0,abraham ,,,,$12.940,$22.000,,$18.000,"0,70",$0
+Lima hedstroem segunda serie 25mm,,,,0,0,abraham ,,,,$12.940,$22.000,,$18.000,"0,70",$0
 Limas Fanta preserie en 21mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
 Limas Fanta preserie en 25mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
 Limas Fanta preserie en 31mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
@@ -1087,8 +1092,6 @@ Limas Fanta primera y segunda serie estuche ,,,,0,0,abraham ,,0,,$14.340,$25.000
 Limas Fanta segunda en 21mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
 Limas Fanta segunda en 25mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
 Limas Fanta segunda en 31mm,,,,0,0,abraham ,,0,,$12.940,$22.000,,$18.000,"0,70",$0
-Lima hedstroem primera serie 25mm,,,,0,0,abraham ,,,,$12.940,$22.000,,$18.000,"0,70",$0
-Lima hedstroem segunda serie 25mm,,,,0,0,abraham ,,,,$12.940,$22.000,,$18.000,"0,70",$0
 LIMAS FLEXOFILE 21mm 1ra serie,,,,0,,Dentsplay Ramon ,,,,$39.270,$62.000,,,"0,58",$0
 LIMAS FLEXOFILE 25mm # 15,,Endo kit 23,,0,,Dentsplay Ramon ,,,,$39.270,$62.000,,,"0,58",$0
 LIMAS FLEXOFILE 25mm # 20,,Endo kit 23,,0,,Dentsplay Ramon ,,,,$39.270,$62.000,,,"0,58",$0
@@ -1155,12 +1158,12 @@ llave ortodoncia por paquete,"importado $9402 // Daza $8,000 // Padilla $9,200 /
 llave ortodoncia por unidad ,,,,0,0,ABRAHAM,,revisar,,$230,$1.000,,,"3,35",$0
 Localizador de Apice,,,,,,importada,,,,$295.000,$490.000,,,"0,66",
 loseta de vidrio X UNIDAD,AQUILES 2142,,,30,0,aquiles Bertulio,,40,,$2.200,$4.000,,,"0,82",$0
-"Lupa 3,5 bio art ",,,,0,0,JULVIDENT,,2,,$208.000,$240.000,,,,
+"Lupa 3,5 bio art ",promo $176.800 mayo/25,,,,176800,JULVIDENT,,2,,$208.000,$240.000,,$200.000,,
 Lupa ajustable sin luz led alexiño,,,,0,0,importado,,1,, $192.089,$320.000,,,,
 LUPAS VISOR CON  LED Y LENTES,,,,0,,CENTRO JOSE ,,,,$65.000,$95.000,,,"0,46",$0
 LUXA CROWN ,,,,0,0,ABRAHAM ,,0,,,$615.000,,,,
 LUXACORE,,,,0,0,ABRAHAM,,0,,$191.600,$239.000,,,"0,25",$0
-macro modelo plastico,AQUILES $21932 / DYMA $23800 / Dentmark $25000,,PEDIR AQUILES,0,2,AQUILES DYMA,,2,,$21.932,$32.000,,,"0,46","43.863,40"
+macro modelo plastico,AQUILES $21932 / DYMA $23800 / Dentmark $25000,,PEDIR AQUILES,0,2,AQUILES DYMA,,2,,$21.932,$35.000,,,"0,60","43.863,40"
 malla tarro METRO,,,,0,,CENTRO WASHINGTON,,,,$400,$5.600,,,"13,00",$0
 MANDRIL 3M,,,,0,,RAMON importado,,,,$10.000,$40.000,,,"3,00",$0
 mandril con Felpa de trapo,241019,aqulies $1440,,0,0,Masterdent AQUILES,,50,,$2.694,$5.000,,,"0,86",$0
@@ -1192,8 +1195,8 @@ MESA O BANDEJA  DE CCOCCION ,,,,0,0,AQUILES ,,0,,$16.660,$23.000,,,"0,38",
 METAL NPG LABORATORIO,DYMA ,,,0,,ramon  DYMA,,,,$5.508,$9.000,,,"0,63",$0
 Mi Paste GC desensibilizante encia,,,,0,0,MASDENTAL,,0,,$48.900,$70.000,,,"0,43",$0
 MI paste Plus GC,,,,,0,LA MUELA,,,,$90.375,$110.000,,$98.000,"0,22",
-Micro Arenador ,,,,0,0,JULVIDENT,,3,,$595.000,$720.000,,$640.000,"0,21",$0
-MICROBRUSH micro aplicadores  X 100  Amarillo Azul Verde Morado Blanco ,NEW STETIC $8330 //  IMPORQ $6000 // DENT$5500,kit zafira,,,,New Stetic IMPORQ  Dent Marck,0,,,$7.616,$13.000,,$9.000,"0,71",$0
+Micro Arenador ,PRMO MAYO 2025 $550000,,,,,JULVIDENT,,3,,$595.000,$720.000,,$640.000,"0,21",$0
+MICROBRUSH micro aplicadores  X 100  Amarillo Azul Verde Morado Blanco ,NEW STETIC $8330 //  IMPORQ $6000 // DENT$5500,kit zafira,,16 amaillor 16 azul 16 morado 12 blanco 12 verde ,blanco 12 amarillo 12 fucsia 4,New Stetic IMPORQ  DTM,0,,,$7.616,$13.000,,$9.000,"0,71",#VALUE!
 Micromotor Champion 3,,,,0,0,Masterdent,,0,,$488.913,$720.000,,,"0,47",$0
 MICROMOTOR PARA LABORATORIO CON LAPIZ,,,,0,0,IMPORTADA,,1,,$239.400,$550.000,,,"1,30",$0
 MICROMOTOR PARA LABORATORIO con pieza de baja ,,,,0,0,IMPORTADA,,0,,$291.000,$550.000,,,"0,89",$0
@@ -1204,7 +1207,7 @@ Mini endoblock maillefer,,Endo kit 23,,0,5,Dentsplay Ramon ,,,,$87.999,$110.000,
 mini endoblock plastico economico,,,,0,0,Aquiles,,0,,$7.000,$12.000,,,"0,71",$0
 MINI RUEDA DE TRAPO BEIGE,248003,,,0,0,Masterdent AQUILES,,30,,$952,$2.000,,,"1,10",$0
 MISERIUM Enna resina IWS ESTETICA,,ALTA ESTETICA,,0,0,ABRAHAM,,0,,$206.700,$229.700,EXC,,"0,11",$0
-"modelin resin 1,5 BISCO modelador de resina",promo $51300,,,0,0,JULVIDENT bisco,174,3,05-2027,$87.000,$120.000,,$90.000,"0,38",$0
+"modelin resin 1,5 BISCO modelador de resina",promo $77.350 mayo/25,,,,,JULVIDENT bisco,174,3,05-2027,$87.000,$120.000,,$90.000,"0,38",$0
 Modelo de ivorina FRASACO FG3 adulto,DYMA $95200,,PEDIR DYMA,0,15,JORGE DYMA,,11,,$96.000,$130.000,,$110.000,"0,35",$1.440.000
 Modelo de ivorina PEDIATRICO,DYMA $95200,,PEDIR DYMA,0,15,JORGE DYMA,,0,,$96.000,$130.000,,,"0,35",$1.440.000
 Modelo de yeso con dientes de ivorina Adulto Y-560,DYMA $41650,,PEDIR DYMA,0,15,Aquiles jorge DYMA,,5,,$45.000,$65.000,,$55.000,"0,44",$675.000
@@ -1231,9 +1234,9 @@ Muflas R 15 ,,,,0,0,Sneider,,0,,$57.120,$72.000,,,"0,26",$0
 Muflas R 20,,,,0,0,Sneider,,0,,$65.450,$82.000,,,"0,25",$0
 NASION COMPLETO WHIPMIX  NACIONAL ,,,,0,0,PORTILLO ,,revisar,,$70.000,$120.000,,,"0,71",$0
 NASION COMPLETO WHIPMIX ORIGINAL ,,,,0,0,Biodentales,,,,$244.200,$290.000,,,"0,19",$0
-New foil galon NOVAFOIL ,,,,,,new stetic,0,,,$87.822,$120.000,,,"0,37",$0
+New foil galon NOVAFOIL ,,,,,,new stetic,0,,,$95.081,$126.000,,,"0,33",$0
 New foil x LITRO 1000CC ,,,,,,new stetic,0,,,$23.300,$35.000,,,"0,50",$0
-New-foil  porcion ,,,,0,0,unidental ,,21,,$2.400,$5.000,,,"1,08",$0
+New-foil  porcion ,,,,0,0,unidental ,,21,,$2.520,$5.000,,,"0,98",$0
 NITIFLEX 25 MAILEFER,ramon $111.146,Endo kit 23,,,,Dentsplay Ramon ,,,,$120.499,$140.000,,,"0,16",$0
 novacryl Flow 40gm A1,,,,,,New Stetic,0,1,10-2026,$23.562,$30.000,"1,19",$27.200,"0,27",$0
 novacryl Flow 40gm A2,,,,,,New Stetic,0,0,,$23.562,$30.000,"1,19",$27.200,"0,27",$0
@@ -1267,7 +1270,7 @@ Oxido de aluminio para microarenador 50 micras,aquiles$20000 masdental $22900,,,
 Oxido de zinc 10g ,,,,,,RAMON PROQUIDENT PRODONT ,,18,1/4/2027 10/2026,$3.436,$7.000,,,"1,04",$0
 PAD SUTURA TABLA ROSADA SILICONADA ,,,,0,0,DENTAL LA U ALLERS,0,0,,$29.000,$45.000,,,"0,55",$0
 Palillo de seda dental flosstick  Niño,NO PEDIR,,,0,0,ZENDENT,,0,,$5.543,$9.000,,,"0,62",$0
-Palillo Seda Flosstick Adulto ,NO PEDIR,,,0,0,ZENDENT,,5,,$5.543,$9.000,,,"0,62",$0
+Palillo Seda Flosstick Adulto ,proquident  x20 $3052 zendent x20 $9055,,,0,0,ZENDENT proquident,,5,,$5.543,$7.000,,,"0,26",$0
 Papel Aluminio,,,,0,0,tropicali - limpiahogar,,1,,$6.000,$9.000,,,"0,50",$0
 PAPEL CEFALOMETRICO x libro,,,,0,,RAMON,,,,$850,$1.500,,,"0,76",$0
 papel de amianto,,,,0,0,Monica jorge,,1,,$8.400,$18.000,,,"1,14",$0
@@ -1328,7 +1331,7 @@ Pasta Profilactica(no tarro)solo TUBO colapsible proquident,,subio 10534,,,,PROQ
 pasta zinquenolica GRANDE caja ,,,,0,0,marleny dentales ID - aquiles ,,5,08-2025,$52.400,$68.000,exc,,"0,30",$0
 pasta zinquenolica KELL PAST,,,,0,0,MASDENTAL,,0,,,,,,#DIV/0!,$0
 PASTA ZINQUENOLICA KELLYS PASTE GRANDE INDENTAL,,,,0,0,AQUILES ,,1,,$51.438,$70.000,,$58.000,,
-pasta zinquenolica pequeña,,,,0,0,marleny dentales ID - aquiles ,,0,1/5/2025 07-2025,$16.200,$22.000,,$18.000,"0,36",$0
+pasta zinquenolica pequeña,,,22134,0,0,marleny dentales ID - aquiles ,,0,1/5/2025 07-2025,$16.200,$24.000,,$20.000,"0,48",$0
 PATTERN RESIN LS GC DURALAY ,massdental $165000 la muela $148500,,,0,0,la muela MASDENTAL ,,1,,$149.900,$205.000,,,"0,37",$0
 Peeso - PISO  1 ,Daza $8925,,,0,,abraham RAMON DAZA - IMPORTADA,,,,$8.400,$12.000,,,"0,43",$0
 Peeso - PISO  2,Daza $8925,,,0,,abraham RAMON DAZA - IMPORTADA,,,,$8.400,$12.000,,,"0,43",$0
@@ -1413,14 +1416,14 @@ PINZA ADSON CON GARRA instrumental DELTA,TP42,no pedir,,0,,DELTA ,0,,,$54.134,$9
 PINZA ADSON SIN GARRA instrumental DELTA,TP41,no pedir,,0,,DELTA ,0,,,$54.134,$95.000,,,"0,75",$0
 Pinza algodonera instrumental basico Delta ,DP17,BASICO,,0,,DELTA ,0,,,$43.719,$95.000,,,"1,17",$0
 Pinza ortodontica inox portabracket,,,,0,0,CLAUDIA,,pedir,,$38.800,$70.000,,,"0,80",$0
-PISTOLA LUXATEM - VYSALIS,soccidentales,,,0,0,ABRAHAM - IMPORTADO - julvident soccidentales,,3,,$75.000,$130.000,,$110.000,"0,73",$0
+PISTOLA LUXATEM - VYSALIS,soccidentales,,,,,ABRAHAM - IMPORTADO - julvident soccidentales,,3,,$75.000,$130.000,,$110.000,"0,73",$0
 pistola para dispensar compule resina,,,,0,,RAMON IMPORTADO,,,,$15.000,$70.000,,$55.000,"3,67",$0
 Pistola para dispensar silicona ,,,,0,0,importada soccidentales,,1,,$75.000,$130.000,,$110.000,"0,73",$0
 placa ESSYX,,,,0,0,DYMA,,,,,"$650000 promocion $580,000",,,,
 placa KEYSTONE,,,,0,0,DYMA,,,,,,,,,
-PLACAS ACETATO DURA 0.4,aquiles $1809 / dentmark $2000 / dyma $2500 / GINA $2700,aq,,60,60,JORGE-AQUILES  DYMA dentmart,,40,,$2.000,$4.000,,,"1,00",$120.000
-PLACAS ACETATO DURA 0.6,dentmark $2000 /aquiles $2475 / dyma $2500 / GINA $2800,det,pedir dentmar,0,60,JORGE-AQUILES  DYMA dentmart,,15,,$2.000,$4.000,,,"1,00",$120.000
-PLACAS ACETATO DURA 0.8,dentmark $2500 /dyma $2500 / aquiles $2994 / GINA $3000,,,50,30,JORGE-AQUILES  DYMA dentmart,,10,,$2.500,$5.000,,,"1,00",$75.000
+PLACAS ACETATO DURA 0.4,aquiles $1809 / dentmark $2000 / dyma $2500 / GINA $2700,aq,,0,0,JORGE-AQUILES  DYMA DTM,,,,$2.000,$4.000,,,"1,00",$0
+PLACAS ACETATO DURA 0.6,dentmark $2000 /aquiles $2475 / dyma $2500 / GINA $2800,det,pedir dentmar,0,80,JORGE-AQUILES  DYMA DTM,,,,$2.000,$4.000,,,"1,00",$160.000
+PLACAS ACETATO DURA 0.8,dentmark $2500 /dyma $2500 / aquiles $2994 / GINA $3000,,,0,30,JORGE-AQUILES  DYMA DTM,,,,$2.500,$5.000,,,"1,00",$75.000
 "PLACAS DE LATEX BLANDA 0,4",DENTMARK $1800 Dyma $2023  GINA $2400   AQUILES $3213 ,,,0,60,JORGE-AQUILES  DYMA,,80,,$2.300,$4.000,,,"0,74",$138.000
 "PLACAS DE LATEX BLANDA 0,6",DENTMARK $2000  Dyma $2142 GINA $2500  AQUILES $3213 ,,,0,30,JORGE-AQUILES  DYMA,,65,,$2.300,$4.000,,,"0,74",$69.000
 "PLACAS DE LATEX BLANDA 0,8",DENTMAK $2200 Dyma $2261  GINA $2600  AQUILES $3213 ,,agotado dentamrt,50,50,JORGE-AQUILES  DYMA,,60,,$2.500,$5.000,,,"1,00",$125.000
@@ -1457,7 +1460,7 @@ Primma art 7 gr FGM - visacril - visalis  Color A1 ,SOCCID 68300 plus $68000,PRE
 Primma art 7 gr FGM - visacril - visalis  Color A2,SOCCID 68300 plus $68000,PRECIO 20 MAYO,68300,0,0,FGM soccident,,,1/3/2025 01-2026,$72.000,$100.000,EXC,,"0,39",$0
 Primma art 7 gr FGM - visacril - visalis  Color-Bleach,SOCCID 68300 plus $68000,PRECIO 20 MAYO,68300,0,0,FGM soccident,,,04-2025,$72.000,$100.000,exc,,"0,39",$0
 Primma art 75gr FGM - visacril - visalis  Color-Bleach,plus $272000,PRECIO 20 MAYO,272600,0,0,FGM soccident,,,,$272.600,$340.000,exc,$210.000,"0,25",$0
-probeta de cristal,,,,0,0,aquiles,,7,,$4.000,$8.000,,,"1,00",$0
+probeta de cristal vidrio ,,,,0,0,aquiles,,7,,$25.000,$45.000,,,"0,80",$0
 probeta plastica tipo cristal  PQTE X 10,,,,1,10,aquiles,,16,,$3.927,$6.000,,,"0,53",$39.270
 Profijet,"imporquirurgica $90,000 importado $52300",,,0,0,BOGOTA,,4,,$115.000,$200.000,,,"0,74",$0
 PROTECTOR DE CEPILLO ,,,,0,0,OXXI zendent ,,100,,$141,$500,,,"2,55",$0
@@ -1492,13 +1495,13 @@ Punta intraoral,,,,0,,RAMON,,,,$250,$1.000,,,"3,00",$0
 punta Jeringa TRIPLE plastica ,,,,0,0,aquiles abraham,,40,,$303,$500,,,"0,65",$0
 punta Jeringa TRIPLE plastica x paquete,IMPORT $48978,,,0,0,aquiles abraham,,0,,$60.518,$80.000,,,"0,32",$0
 punta metalica Jeringa TRIPLE ,IMPORT $1932,,,0,0,hector aquiles ,,100,,$4.760,$8.000,,,"0,68",$0
-punta mezcladora cafes para duo link X UNIDAD,,,,0,0,JULVIDENT,,50,,$1.800,$3.000,,,"0,67",$0
-punta mezcladoras amarillas,,,,0,,abraham - ramon - julvident,,,,$960,$2.000,,,"1,08",$0
-punta mezcladoras Azul naranja por dentro visalis ,,,,0,0,JULVIDENT,,100,,$976,$3.000,,,"2,07",$0
+punta mezcladora cafes para duo link X UNIDAD,,,,,,JULVIDENT,,50,,$1.800,$3.000,,,"0,67",$0
+punta mezcladoras amarillas,,,,,,abraham - ramon - julvident,,,,$960,$2.000,,,"1,08",$0
+punta mezcladoras Azul naranja por dentro visalis ,,,,,,JULVIDENT,,100,,$976,$3.000,,,"2,07",$0
 punta mezcladoras blanca,,,,0,0,,,192,,,,,,#DIV/0!,
-punta mezcladoras CUADRADAS NUEVAS TRANSP AZUL,,,,0,0,JULVIDENT,,100,,$1.875,$3.000,,,"0,60",$0
-punta mezcladoras Rosada,,,,0,0,JULVIDENT,,100,,$800,$3.000,,,"2,75",$0
-punta mezcladoras verdes,,,,0,0,JULVIDENT,,300,,$1.162,$3.000,,,"1,58",$0
+punta mezcladoras CUADRADAS NUEVAS TRANSP AZUL,,,,,,JULVIDENT,,100,,$1.875,$3.000,,,"0,60",$0
+punta mezcladoras Roja,promo $1594 mayo/25,,,,,JULVIDENT,,100,,$1.594,$3.000,,,"0,88",$0
+punta mezcladoras verdes,,,,,,JULVIDENT,,300,,$1.162,$3.000,,,"1,58",$0
 Puntas de Papel 1ra  SERIE,DAZA $19278 RAMON $18903 abraham $14530  SOCCID #13800,,,0,0,ABRAHAM RAMON Daza SOCCIDENTALES,,,,$14.900,$20.000,exc,,"0,34",#REF!
 Puntas de Papel 2da SERIE,DAZA $19278 RAMON $18903 abraham $14530  SOCCID #13800,,,0,0,ABRAHAM RAMON Daza SOCCIDENTALES,,,,$14.530,$20.000,exc,,"0,38",#REF!
 puntas delgada intraoral para duo link ,,,,10,0,ABRAHAM,,,,$2.083,$4.000,,,"0,92",$0
@@ -1520,12 +1523,12 @@ RAYOS X PORTATIL ,,,,0,,RAMON ,,,,$3.960.000,$4.800.000,,,"0,21",$0
 RC prep  jeringa caja x 5,,,,1,0,abraham ramon,,,11-2025,$34.270,$42.000,,,"0,23",$0
 Recipiente familiar  1.8 litros O 3 rimo,,,,0,,CENTRO- LA 15- la 13 - la mejor,,,,$3.400,$6.000,,,"0,76",$0
 Recipiente redondo TAPER hermetico  mini lujo,, ,,0,0,PERSAL CENTRO- LA 15- la 13 ,0,5,,$3.995,$7.000,,,"0,75",$0
-registro mordida futar clear TRANSPARENTE X unidad silicona,,silic REG MORD TRANSP,,0,0,JULVIDENT panasil,,22,06-2025,$87.120,$120.000,,$70.000,"0,38",$0
+registro mordida futar clear TRANSPARENTE X unidad silicona,,silic REG MORD TRANSP,,,,JULVIDENT panasil,4 jun / 9 oct ,22,06-2025,$87.120,$120.000,,$70.000,"0,38",$0
 registro mordida futar D silicona,,silic REG MORD,,,,JULVIDENT panasil,,5,,$91.000,$120.000,,$100.000,"0,32",$0
 Registro mordida obite DMG SILICONA,,silic REG MORD,,0,0,ABRAHAM,,0,,$96.500,$120.500,,,"0,25",$0
-Regular COLTENE silicona medium,,silic REGULAR,,0,0,ULTRADENTAL ,,0,,$82.400,$120.000,,,"0,46",$0
+Regular COLTENE silicona medium,,silic REGULAR,,0,0,ULTRADENTAL ,,0,,$82.400,$120.000,,$100.000,"0,46",$0
 Regular DMG  silicona medium Silagum,,silic REGULAR,,0,0,ABRAHAM,,0,,$92.600,$115.700,,,"0,25",$0
-REGULAR PANASIL Silicona,,silic REGULAR,,0,0,JULVIDENT panasil,,41,,$87.120,$120.000,,,"0,38",$0
+REGULAR PANASIL Silicona,promo $77350 mayo/25,silic REGULAR,,,,JULVIDENT panasil,,41,,$87.120,$120.000,,,"0,38",$0
 Regular ZHERMACK silicona ,euro $109044,silic REGULAR,,0,12,MASDENTAL EURODENT,,0,,$114.500,$160.000,,,"0,40",$1.374.000
 Rejillas PAQUETE X 12,aquiles 6664,,,0,0,Aquiles,,20,,$555,$1.500,,,"1,70",$0
 RELIX U 2OO ,GABRIEL VELAZQUEZ XM $414.  /// MARKET XM$409.  /// CESAR 450 /// POPAY $415 /// VTA PUBLIC 489,,,0,,GABRIEL VELAZ MARKET MASDENTAL RAMON ,,,08-2025,$415.000,$490.000,exc,,"0,18",$0
@@ -1579,7 +1582,7 @@ Resina Brillant A3-D3 Dentina,$33.000,,,0,2,ULTRADENTAL,,1,,$46.297,$58.000,EXC,
 Resina Brillant A3-D3 Esmalte ,$33.000,,,0,2,ULTRADENTAL,,0,,$46.297,$58.000,EXC,$52.000,"0,25",$92.594
 Resina Brillant A3.5   Esmalte ,$33.000,,,0,1,ULTRADENTAL,,0,,$46.297,$58.000,EXC,$52.000,"0,25",$46.297
 Resina brillant A3.5 Dentina,$33.000,,,0,1,ULTRADENTAL,,0,,$46.297,$58.000,EXC,$52.000,"0,25",$46.297
-Resina Charisma jeringa 4gr BL,,ALTA ESTETICA,,0,0,MASDENTAL,,46,,$180.000,$260.000,EXC,$220.000,"0,44",$0
+Resina Charisma jeringa 4gr BL,,ALTA ESTETICA,,0,0,MASDENTAL,,46,,$180.000,$260.000,EXC,promo fecha $190000,"0,44",$0
 Resina Charisma jeringa 4gr BLX,,ALTA ESTETICA,,0,0,MASDENTAL,,29,,$180.000,$260.000,EXC,$220.000,"0,44",$0
 Resina Charisma jeringa 4gr OB,,ALTA ESTETICA,,0,0,MASDENTAL,,29,,$180.000,$260.000,EXC,$220.000,"0,44",$0
 Resina compuesta uniporcion,,,,0,,abraham ramon,,,,$3.000,$6.000,EXC,,"1,00",$0
@@ -1615,8 +1618,8 @@ Resina Forma Ultradent XWB ,,PRECIO 20 MAYO,62500,2,0,Gabriel Vel pluss ,0,4,04-
 Resina Forma Ultradent XWE,,,,0,0,Gabriel Vel pluss ,2,4,04-2027,$76.458,$98.000,EXC,$88.000,"0,28",$0
 RESINA KERR Herculite A1 Enamel,,,,0,0,Pluss Dent GAB VEL,1,0,,$97.600,$120.000,EXC,$102.000,"0,23",$0
 RESINA KERR Herculite A2 Enamel,,,,0,0,Pluss Dent GAB VEL,1,0,,$97.600,$120.000,EXC,$102.000,"0,23",$0
-RESINA KERR Herculite XL Enamel,,,,0,0,Pluss Dent GAB VEL,6,15,03-2027,$97.600,$120.000,EXC,$102.000,"0,23",$0
-RESINA KERR Herculite XL2 Enamel,,,,0,0,Pluss Dent GAB VEL,11,10,02-2027,$97.600,$120.000,EXC,$102.000,"0,23",$0
+RESINA KERR Herculite XL Enamel,promo junio $87860,,,0,0,Pluss Dent GAB VEL,6,15,03-2027,$97.600,$120.000,EXC,$102.000,"0,23",$0
+RESINA KERR Herculite XL2 Enamel,promo junio $87860,,,0,0,Pluss Dent GAB VEL,11,10,02-2027,$97.600,$120.000,EXC,$102.000,"0,23",$0
 RESINA KERR Neofil A1  4 gramos,,,,0,0,Pluss Dent GAB VEL,0,0,04-2027,$26.700,$38.000,EXC,,"0,42",$0
 RESINA KERR Neofil A2  4 gramos,,,,0,0,Pluss Dent GAB VEL,0,0,04-2027,$26.700,$38.000,EXC,,"0,42",$0
 RESINA KERR Neofil A3  4 gramos,,,,0,0,Pluss Dent GAB VEL,0,0,,$26.700,$38.000,EXC,,"0,42",$0
@@ -1633,10 +1636,10 @@ Resina Opallis Flow Fluida A2  FGM ,antioq $30000 soccid $ 28700 plus $28800,,,0
 Resina Opus Flow APS BULK FILL A1,compre promo $59500,,,0,2,FGM masdental soccidentales,,0,,$72.000,$100.000,,,"0,39",$144.000
 Resina Opus Flow APS BULK FILL A2,compre promo $59501,PRECIO 20 MAYO,62000,0,2,FGM masdental soccidentales,,0,06-2025,$72.000,$100.000,,,"0,39",$144.000
 RESINA ORTODONCIA HELIOSIT ,,,,0,0,no se,,0,,$23.000,$40.000,EXC,,"0,74",$0
-Resina Palfique LX5 TOKUYAMA color A1,,,,,,JULVIDENT MASDENTAL,,1,,$213.000,$260.000,EXC,$200.000,"0,22",$0
-Resina Palfique LX5 TOKUYAMA color A2 esmalte,,,,,,JULVIDENT MASDENTAL,,0,,$213.000,$260.000,EXC,$200.000,"0,22",$0
-Resina Palfique LX5 TOKUYAMA color BW,"MASDENTAL $199,900 julvident $180,625",,,,,JULVIDENT MASDENTAL,,1,,$213.000,$260.000,EXC,$200.000,"0,22",$0
-Resina Palfique LX5 TOKUYAMA color WE,"MASDENTAL $199,900 julvident $180,625",,,,,JULVIDENT MASDENTAL,,0,,$213.000,$260.000,EXC,$200.000,"0,22",$0
+Resina Palfique LX5 TOKUYAMA color A1,promo $170.000 mayo/25,,,,,JULVIDENT MASDENTAL,,1,,$213.000,$260.000,EXC,$200.000,"0,22",$0
+Resina Palfique LX5 TOKUYAMA color A2 esmalte,promo $170.000 mayo/25,,,,,JULVIDENT MASDENTAL,,0,,$213.000,$260.000,EXC,$200.000,"0,22",$0
+Resina Palfique LX5 TOKUYAMA color BW,promo $170.000 mayo/25,,,,,JULVIDENT MASDENTAL,,1,,$213.000,$260.000,EXC,$200.000,"0,22",$0
+Resina Palfique LX5 TOKUYAMA color WE,promo $170.000 mayo/25,,,,,JULVIDENT MASDENTAL,,0,,$213.000,$260.000,EXC,$200.000,"0,22",$0
 resina restaurativa compuesta 3M bulk Fill A2,miguel $100,,,0,,RAMON ,,,,$88.000,$130.000,EXC,,"0,48",$0
 Resina SDI LUNA Enamel 4 g,,,,0,0,ABRAHAM,,0,,$40.000,$54.000,EXC,,"0,35",$0
 Resina Solare LATIN Amarilla A1,,,,0,0,La muela,,3,01-2026,$87.250,$115.000,EXC,$94.000,"0,32",$0
@@ -1723,9 +1726,9 @@ SILICONA  pesada 200  ZHERMACK,pesada,silic PESADA,,0,,RAMON market masdental EU
 SILICONA  PESADA SILAGUM DMG,292818,silic PESADA,,0,0,ABRAHAM,,1,,$213.000,$266.300,"1,19",,"0,25",$0
 Silicona activador indurent gel ZETALABOR,,,,0,2,DENTALES MARKET eurodent,,0,,$43.769,$60.000,,,"0,37",$87.538
 SILICONA LIVIANA COLTENE PRESIDENT ,,Silic LIV,,0,0,ULTRADENTAL ,,10,,$82.400,$120.000,,$98.000,"0,46",$0
-silicona panasil initial contac light liviana ,,Silic LIV,,,,JULVIDENT panasil,,40,$120,$91.000,$120.000,"1,19",$98.000,"0,32",$0
-silicona panasil putty soft pesada 400ml,,silic PESADA,,0,0,JULVIDENT panasil,,189,$210,$180.000,$210.000,"1,19",$180.000,"0,17",$0
-silicona panasil putty soft pesada 900 ml,,silic PESADA,,,,JULVIDENT panasil,,5,,$407.000,$450.000,,$440.000,"0,11",$0
+silicona panasil initial contac light liviana ,promo $77.350 mayo/25,Silic LIV,,,,JULVIDENT panasil,,40,$120,$91.000,$120.000,"1,19",$98.000,"0,32",$0
+silicona panasil putty soft pesada 400ml,,silic PESADA,,,,JULVIDENT panasil,,189,$210,$180.000,$210.000,"1,19",$180.000,"0,17",$0
+silicona panasil putty soft pesada 900 ml,promo $345950 mayo/25,silic PESADA,,,,JULVIDENT panasil,,5,,$407.000,$450.000,,$440.000,"0,11",$0
 Silicona Pesada KEER EN CARTUCHO,,,,,,plussdent,,,,$86.811,$120.000,,,,
 silicona PESADA panasil 900ml x porciones (56 unidades) x 15gr CON TAPA  ,,,,0,0,unidental,SILIC,0,,$8.036,$10.000,,,"0,24",$0
 Silicona Pesada President COLTENE 300 ML,pesada,silic PESADA,,0,0,ULTRADENTAL ,,8,,$144.500,$210.000,,,"0,45",$0
@@ -1816,9 +1819,9 @@ TETRIC FLOW BULK IVA JERINGA,euro 71470,,,0,3,masdental emma EURODENT,,0,,$71.47
 Tetric N flow A1,EURO 67326,,,0,0,masdental emma EURODENT,,2,07-2027,$71.470,$100.000,,,"0,40",$0
 Tetric N flow bleach L,descontinuada,,,0,0,masdental emma EURODENT,,2,,$71.470,$100.000,,,"0,40",$0
 Tetric N flow Bulk IVA,,,,0,2,masdental emma EURODENT,,0,,$71.470,$100.000,,,"0,40",$142.940
-Thera BASE Bisco,,,,0,0,JULVIDENT bisco,,0,,$300.000,$350.000,,,"0,17",$0
-Thera CAL  Bisco,promo $57600,,,0,102000,JULVIDENT bisco,,1,04-2026,$96.000,$125.000,EXC,$110.000,"0,30",$9.792.000.000
-Thera CEM Bisco,promo 208200,en promo se compro a $289167,,0,0,JULVIDENT bisco,,0,12-2025,$315.455,$390.000,,$295.000,"0,24",$0
+Thera BASE Bisco,,,,,,JULVIDENT bisco,,0,,$300.000,$350.000,,,"0,17",$0
+Thera CAL  Bisco,promo $81600 mayo/25,,,,81600,JULVIDENT bisco,,1,04-2026,$96.000,$125.000,EXC,$110.000,"0,30",$7.833.600.000
+Thera CEM Bisco,,en promo se compro a $289167,,,,JULVIDENT bisco,,0,12-2025,$315.455,$390.000,,$295.000,"0,24",$0
 Tijera Recta para Tejido instrumental DELTA ,S511.5cm,,,0,,DELTA ,0,,,$49.210,$95.000,,,"0,93",$0
 Tinte empress direct color azul,,,,0,0,masdental emma EURODENT,,0,,$90.300,$140.000,,,"0,55",$0
 Tinte empress direct color Blanco,emma $110,,,0,0,masdental emma EURODENT,,1,,$90.300,$140.000,,,"0,55",$0
@@ -1870,18 +1873,18 @@ vaso hermetico 300 ml,,,,0,0,PERSAL CENTRO- LA 15- la 13 ,0,5,,$4.000,$6.000,,,"
 VASO METALICO GRANDE INSTRUMENTAL,,,,0,,CENTRO CRISTALERIA ,,,,$5.000,$10.000,,,"1,00",$0
 VASO METALICO PEQUEÑO INSTRUMENTAL,,,,0,,CENTRO CRISTALERIA ,,,,$5.000,$8.000,,,"0,60",$0
 Vaso silicona con tapa,,,,0,0,CLAUDIA,,,,$11.520,$20.000,,,"0,74",$0
-VASOS DAPPEN EN VIDRIO  CAJA X 10,249003,Ramon $3000  ABRAH $3500  AQUIL $2487 dyma $2975  dentamrt $2600,,0,30,ramon abraham Masterdent aquiles jorge quirudent dyma dentmart,,20,,$3.484,$5.000,,,"0,44",$104.520
+VASOS DAPPEN EN VIDRIO  CAJA X 10,249003,Ramon $3000  ABRAH $3500  AQUIL $2487 dyma $2975  dentamrt $2600,,60,40,ramon abraham Masterdent aquiles jorge quirudent dyma DTM,,,,$3.484,$5.000,,,"0,44",$139.360
 VERABOND II LABORATORIO,DYMA ,,,0,,ramon  DYMA,,,,$6.322,$9.000,,,"0,42",$0
 VIBRADOR GRANDE/PLASTER MODEL VIBRATOR,247006,,,0,0,Masterdent,,,,$230.000,$345.000,,,"0,50",$0
 VIBRADOR PEQUEÑO/ PLASTER MODEL VIBRATOR,247005,,,0,0,Masterdent,,,,$130.000,$195.000,,,"0,50",$0
 VIOSEAL SPIDENT ADSEAL ,, ,,0,0,SOCCIDENTALES,,1,,$106.480,$142.000,EXC,,"0,33",$0
-visalys temp visacril PANASIL,,,,0,0,JULVIDENT panasil,,0,,$445.280,$500.000,,,"0,12",$0
+visalys temp visacril PANASIL,,,,,,JULVIDENT panasil,,0,,$445.280,$500.000,,,"0,12",$0
 VISOR CON LUPA SIN LUZ ESTUCHE GRIS,,,,0,0,IMPORTADO,,1,,,$420.000,,,,
 Visores  la u CARLOS DUQUE,,,,0,0,DENTAL LA U,,19,,$18.000,$28.000,,,"0,56",$0
 Visores  ZENDENT,,,,0,0,zendent,,,,$7.500,$17.000,,,"1,27",$0
 Vitrebon ionomero 3 m,,,,0,0,,,2,05-2025,,,,,,
 vitremer o reconstructor de muñones ,,,,0,,RAMON,,,,$200.000,$245.000,,,"0,23",$0
-vysalis core,,,,0,0,JULVIDENT ,,0,,,,,,#DIV/0!,$0
+vysalis core,,,,,,JULVIDENT ,,0,,,,,,#DIV/0!,$0
 WEDJET,,,,0,,RAMON ultradental ,,,,$68.300,$75.000,,,"0,10",$0
 whiteness super endo FGM diente no vital  jeringa x 3ml,antioq $95200 soccid $80206 plus $79968,,,0,0,FGM soccident,,,,$95.200,$145.000,,,"0,52",$0
 WY PALL WYPALL TOALLA ABSORBENTE x 100 hojas Rollo ,,,,0,,CENTRO 40mil,,,,$28.000,$40.000,,|,"0,43",$0
@@ -1904,5 +1907,7 @@ YESO WHIPMIX TIPO 5 X 100 GR (VERDE)  jadestone,OK,,,0,0,Biodentales,,,,$2.987,$
 YODOPOVIDONA Isodine Espuma   x 60 ml rojo,,,,0,,CENTRO 40mil  ,,,,$9.600,$15.000,,,"0,56",$0
 YODOPOVIDONA Isodine Solucion  x 60 ml verde,,,,0,,CENTRO 40mil  ,,,06-2026,$10.250,$13.000,,,"0,27",$0
 Yopovidona bucofaringeo 10 % x 60 ml azul,,,,0,,CENTRO 40mil ,,,,$9.600,$15.000,exc,,"0,56",$0
-Z PRIME  z-prime 2 ML BISCO,promo $96000,en promo se compro a $133334,,0,0,JULVIDENT bisco,,19,07-205,$160.000,$200.000,,$160.000,"0,25",$0
-zirclean bisco ,promo $57600,,,0,102000,JULVIDENT bisco,,1,01-2026,$96.000,$130.000,,$95.000,"0,35",$9.791.967.360
+Z PRIME  z-prime 2 ML BISCO,promo $144500 mayo/25,en promo se compro a $133334,,,,JULVIDENT bisco,,19,07-205,$160.000,$210.000,,$170.000,"0,31",$0
+zirclean bisco ,promo $86.700 mayo/25,,,,,JULVIDENT bisco,,1,01-2026,$96.000,$130.000,,$95.000,"0,35",$0
+GRAMERA DIGITAL caja azul,,,,0,0,centro HOYOSTOOL,,,,,$45.000,,,,
+GRAMERA DIGITAL pequeña,,,,0,0,centro HOYOSTOOL,,,,,$35.000,,,,

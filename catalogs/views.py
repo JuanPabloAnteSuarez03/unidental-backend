@@ -135,6 +135,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                              openapi.Parameter('barcode', openapi.IN_QUERY, description="Filtrar productos por código de barras (exacto)", type=openapi.TYPE_STRING),
                              openapi.Parameter('category', openapi.IN_QUERY, description="Filtrar productos por ID de categoría", type=openapi.TYPE_INTEGER),
                              openapi.Parameter('category_name', openapi.IN_QUERY, description="Filtrar productos por nombre de categoría (búsqueda parcial)", type=openapi.TYPE_STRING),
+                             openapi.Parameter('min_price', openapi.IN_QUERY, description="Precio de venta mínimo", type=openapi.TYPE_NUMBER, format='decimal'),
+                             openapi.Parameter('max_price', openapi.IN_QUERY, description="Precio de venta máximo", type=openapi.TYPE_NUMBER, format='decimal'),
                          ])
     def list(self, request, *args, **kwargs):
         """Obtiene una lista paginada de productos - OPTIMIZADO.
@@ -148,6 +150,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         - `?barcode=codigobarras` (búsqueda exacta de código de barras)
         - `?category=id_categoria` (ID exacto de la categoría)
         - `?category_name=nombrecategoria` (búsqueda parcial en nombre de categoría)
+        - `?min_price=minprice` (precio de venta mínimo)
+        - `?max_price=maxprice` (precio de venta máximo)
         """
         from .serializers import ProductSummarySerializer
         
@@ -203,6 +207,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             openapi.Parameter('barcode', openapi.IN_QUERY, description="Filtrar productos por código de barras (exacto)", type=openapi.TYPE_STRING),
             openapi.Parameter('category', openapi.IN_QUERY, description="Filtrar productos por ID de categoría", type=openapi.TYPE_INTEGER),
             openapi.Parameter('category_name', openapi.IN_QUERY, description="Filtrar productos por nombre de categoría (búsqueda parcial)", type=openapi.TYPE_STRING),
+            openapi.Parameter('min_price', openapi.IN_QUERY, description="Precio de venta mínimo", type=openapi.TYPE_NUMBER, format='decimal'),
+            openapi.Parameter('max_price', openapi.IN_QUERY, description="Precio de venta máximo", type=openapi.TYPE_NUMBER, format='decimal'),
         ],
         responses={
             200: openapi.Response(
@@ -224,6 +230,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         - ?barcode=codigobarras (búsqueda exacta de código de barras)
         - ?category=id_categoria (ID exacto de la categoría)
         - ?category_name=nombrecategoria (búsqueda parcial en nombre de categoría)
+        - ?min_price=minprice (precio de venta mínimo)
+        - ?max_price=maxprice (precio de venta máximo)
         """
         from .serializers import ProductSummarySerializer
         

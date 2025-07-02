@@ -7,13 +7,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db.models.signals import post_delete
 
 # Import all models
 from catalogs.models import Category, Product, ProductBatch
 from catalogs.validators import SKUValidator
 from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location, InventoryStock, InventoryMovement
-from sales.models import Customer, Sale, SaleItem
+from sales.models import Customer, Sale, SaleItem, ReturnItem, Return, update_inventory_on_return_item_delete, update_return_total
 from credits.models import CreditAccount, CreditPayment
 
 
@@ -29,19 +30,32 @@ class Command(BaseCommand):
         parser.add_argument(
             'csv_file',
             nargs='?',
-            default='UNIDENTAL - COMPRAS E INV.csv',
-            help='Ruta al archivo CSV (por defecto: UNIDENTAL - COMPRAS E INV.csv)'
+            default='UNIDENTAL - COMPRAS E INV (1).csv',
+            help='Ruta al archivo CSV (por defecto: UNIDENTAL - COMPRAS E INV (1).csv)'
         )
         parser.add_argument(
             '--clear-data',
             action='store_true',
             help='Limpiar toda la base de datos antes de importar'
         )
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Simular la ejecución sin aplicar cambios en la base de datos'
+        )
         # Se elimina la opción de datos de demostración para este script
         # por la complejidad que añade al procesamiento en lotes.
 
     def __init__(self):
         super().__init__()
+        # Asegurar que stdout use UTF-8 para evitar UnicodeEncodeError en Windows
+        import sys
+        try:
+            if sys.stdout and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            # Si falla, ignorar y continuar. Los caracteres no representables se reemplazarán.
+            pass
         self.validator = SKUValidator()
         self.category_mapping = self._create_category_mapping()
         
@@ -224,28 +238,57 @@ class Command(BaseCommand):
         return None
 
     def _clean_price(self, price_str):
-        """
-        Limpia y convierte una cadena de precio a Decimal.
-        """
-        if not price_str or price_str.strip() == '':
+        """Limpia y convierte un precio a Decimal manejando puntos y comas como separadores."""
+        if not price_str:
             return None
-        
-        cleaned = re.sub(r'[^\d.,\$]', '', str(price_str))
-        cleaned = cleaned.replace('$', '')
-        
-        if ',' in cleaned and '.' in cleaned:
-            cleaned = cleaned.replace(',', '')
-        elif ',' in cleaned:
-            parts = cleaned.split(',')
-            if len(parts) == 2 and len(parts[1]) <= 2:
-                cleaned = cleaned.replace(',', '.')
-            else:
-                cleaned = cleaned.replace(',', '')
-        
-        try:
-            return Decimal(cleaned)
-        except (InvalidOperation, ValueError):
+
+        txt = str(price_str).strip()
+        if txt == '':
             return None
+
+        # Buscar patrones de precio usando regex - tomar el primero
+        price_patterns = [
+            r'\$?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)',  # Precio con separadores de miles
+            r'\$?(\d+(?:[.,]\d{2})?)',  # Precio simple con decimales opcionales
+            r'\$?(\d+)'  # Solo números
+        ]
+        
+        for pattern in price_patterns:
+            matches = re.findall(pattern, txt)
+            if matches:
+                # Tomar solo el primer precio encontrado
+                price_match = matches[0]
+                
+                # Limpiar el precio encontrado
+                clean_txt = price_match.strip()
+                
+                # Manejar separadores
+                if '.' in clean_txt and ',' in clean_txt:
+                    clean_txt = clean_txt.replace('.', '')
+                    clean_txt = clean_txt.replace(',', '.')
+                elif ',' in clean_txt and '.' not in clean_txt:
+                    parts = clean_txt.split(',')
+                    if len(parts[-1]) == 2:
+                        clean_txt = clean_txt.replace(',', '.')
+                    else:
+                        clean_txt = clean_txt.replace(',', '')
+                elif '.' in clean_txt and ',' not in clean_txt:
+                    parts = clean_txt.split('.')
+                    if len(parts[-1]) == 3 and len(parts) > 1:
+                        clean_txt = clean_txt.replace('.', '')
+
+                try:
+                    price = Decimal(clean_txt)
+                    # Validar que el precio no sea demasiado grande
+                    if price >= Decimal('10000000000'):  # 10^10 = límite máximo
+                        self.errors.append(f"Precio '{price_str}' ({price}) es demasiado grande y fue ignorado")
+                        return None
+                    return price
+                except (InvalidOperation, ValueError):
+                    continue
+        
+        # Si no se encontró ningún patrón válido
+        return None
 
     def _clean_stock_quantity(self, stock_str, row_num_for_error):
         """
@@ -300,22 +343,35 @@ class Command(BaseCommand):
         """
         self.stdout.write("🗑️  Limpiando base de datos...")
         with transaction.atomic():
-            CreditPayment.objects.all().delete()
-            CreditAccount.objects.all().delete()
-            SaleItem.objects.all().delete()
-            Sale.objects.all().delete()
-            Customer.objects.all().delete()
-            InventoryMovement.objects.all().delete()
-            InventoryStock.objects.all().delete()
-            from purchases.models import PurchaseOrderItem, PurchaseOrder
-            PurchaseOrderItem.objects.all().delete()
-            PurchaseOrder.objects.all().delete()
-            PurchaseOption.objects.all().delete()
-            ProductBatch.objects.all().delete()
-            Product.objects.all().delete()
-            Category.objects.all().delete()
-            Supplier.objects.all().delete()
-            Location.objects.all().delete()
+            # Desconectar señales que actualizan inventario y totales
+            post_delete.disconnect(update_inventory_on_return_item_delete, sender=ReturnItem)
+            post_delete.disconnect(update_return_total, sender=ReturnItem)
+            try:
+                # Eliminar devoluciones primero
+                ReturnItem.objects.all().delete()
+                Return.objects.all().delete()
+
+                # Ahora se pueden eliminar los items y ventas sin restricciones
+                SaleItem.objects.all().delete()
+                Sale.objects.all().delete()
+                Customer.objects.all().delete()
+                InventoryMovement.objects.all().delete()
+                InventoryStock.objects.all().delete()
+                from purchases.models import PurchaseOrderItem, PurchaseOrder
+                PurchaseOrderItem.objects.all().delete()
+                PurchaseOrder.objects.all().delete()
+                PurchaseOption.objects.all().delete()
+                ProductBatch.objects.all().delete()
+                Product.objects.all().delete()
+                Category.objects.all().delete()
+                Supplier.objects.all().delete()
+                Location.objects.all().delete()
+                CreditPayment.objects.all().delete()
+                CreditAccount.objects.all().delete()
+            finally:
+                # Reconectar señales
+                post_delete.connect(update_inventory_on_return_item_delete, sender=ReturnItem)
+                post_delete.connect(update_return_total, sender=ReturnItem)
         self.stdout.write("✅ Base de datos limpiada")
 
     def _preload_caches(self):
@@ -338,16 +394,24 @@ class Command(BaseCommand):
         """
         csv_file_path = options['csv_file']
         clear_data_flag = options['clear_data']
+        dry_run_flag = options.get('dry_run')
         
         if not os.path.exists(csv_file_path):
             raise CommandError(f"El archivo '{csv_file_path}' no existe.")
 
         if clear_data_flag:
             self.stdout.write(self.style.WARNING('Limpiando la base de datos...'))
-            self._clear_database()
-            self.stdout.write(self.style.SUCCESS('Base de datos limpiada.'))
+            if dry_run_flag:
+                with transaction.atomic():
+                    self._clear_database()
+                    transaction.set_rollback(True)
+                self.stdout.write(self.style.WARNING('DRY RUN: Limpieza simulada sin cambios persistentes.'))
+            else:
+                self._clear_database()
+                self.stdout.write(self.style.SUCCESS('Base de datos limpiada.'))
 
-        self.stdout.write(self.style.SUCCESS(f'Iniciando la importación desde {csv_file_path}'))
+        self.stdout.write(self.style.SUCCESS(
+            f"Iniciando la importación desde {csv_file_path} ({'DRY RUN' if dry_run_flag else 'EJECUCIÓN REAL'})"))
 
         self._preload_caches()
 
@@ -363,10 +427,14 @@ class Command(BaseCommand):
             
             for row_num, row in enumerate(reader, 1):
                 try:
-                    if len(row) < 12: continue
+                    if len(row) < 12:
+                        continue
                     
                     product_name = row[0].strip()
                     if not product_name or product_name.startswith('NO USAR'): continue
+                    
+                    # Extraer referencias para la descripción
+                    referencias = row[1].strip() if len(row) > 1 else ''
                     
                     cat_info = self._categorize_product(product_name)
                     sku = self.validator.generate_next_sku(cat_info[0], cat_info[1], cat_info[2], existing_skus)
@@ -375,6 +443,12 @@ class Command(BaseCommand):
                     fecha_vencimiento = self._parse_date(row[9].strip())
                     requires_batch = fecha_vencimiento is not None
 
+                    sale_price_val = self._clean_price(row[11].strip()) if len(row) > 11 else None
+                    
+                    # Crear descripción con referencias si están disponibles
+                    description = ""
+                    if referencias and referencias.lower() != 'referencias':
+                        description = referencias
                     cat_name = self.validator.CATEGORIAS.get(cat_info[0], cat_info[0])
                     if cat_name not in self.category_cache:
                         category = Category.objects.create(name=cat_name, description=f"Categoría {cat_name}")
@@ -383,9 +457,11 @@ class Command(BaseCommand):
                     product = Product(
                         sku=sku,
                         name=product_name,
+                        description=description,
                         unit='unidad', # Simplificado para el script
                         category_id=self.category_cache[cat_name].id,
-                        requires_batch_control=requires_batch
+                        requires_batch_control=requires_batch,
+                        sale_price=sale_price_val
                     )
                     products_to_create.append(product)
                     
@@ -396,6 +472,7 @@ class Command(BaseCommand):
                         'fecha_vencimiento': fecha_vencimiento,
                         'supplier_name': self._extract_supplier_name(row[6].strip()),
                         'precio_compra': self._clean_price(row[10].strip()),
+                        'precio_venta': sale_price_val,
                         'stock_sur': self._clean_stock_quantity(row[7].strip(), row_num),
                         'stock_norte': self._clean_stock_quantity(row[8].strip(), row_num),
                     })
@@ -507,12 +584,18 @@ class Command(BaseCommand):
                 # Es más seguro crearlos uno por uno si son necesarios, o re-evaluar si
                 # la creación masiva de stock es suficiente para el estado inicial.
                 
-                self.stdout.write("✅ Transacción completada exitosamente.")
+                if dry_run_flag:
+                    transaction.set_rollback(True)
+                    self.stdout.write("⚠️  DRY RUN: transacción revertida, no se aplicaron cambios.")
+                else:
+                    self.stdout.write("✅ Transacción completada exitosamente.")
 
         except Exception as e:
             raise CommandError(f'Error durante la creación masiva: {e}')
         
         self._show_summary()
+        if dry_run_flag:
+            self.stdout.write(self.style.WARNING("DRY RUN finalizado: no se modificó la base de datos."))
 
     def _show_summary(self):
         """Muestra el resumen final de la población."""

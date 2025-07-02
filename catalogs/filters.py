@@ -28,8 +28,10 @@ class ProductFilter(django_filters.FilterSet):
     barcode = django_filters.CharFilter(field_name='barcode', lookup_expr='exact')
     category = django_filters.NumberFilter(field_name='category__id') # Filtra por el ID de la categoría
     category_name = django_filters.CharFilter(field_name='category__name', lookup_expr='icontains')
+    min_price = django_filters.NumberFilter(field_name='sale_price', lookup_expr='gte')
+    max_price = django_filters.NumberFilter(field_name='sale_price', lookup_expr='lte')
     # Podrías añadir filtros por 'unit', etc.
 
     class Meta:
         model = Product
-        fields = ['name', 'sku', 'barcode', 'category', 'category_name'] 
+        fields = ['name', 'sku', 'barcode', 'category', 'category_name', 'min_price', 'max_price'] 
