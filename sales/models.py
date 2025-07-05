@@ -12,8 +12,11 @@ class Customer(models.Model):
     """Modelo para gestionar la información de clientes."""
     
     name = models.CharField(max_length=200, verbose_name="Nombre")
-    phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Teléfono")
+    phone = models.CharField(max_length=50, blank=True, null=True, verbose_name="Teléfono")
     email = models.EmailField(max_length=100, blank=True, null=True, verbose_name="Correo electrónico")
+    address = models.TextField(blank=True, null=True, verbose_name="Dirección")
+    birthday = models.DateField(blank=True, null=True, verbose_name="Fecha de cumpleaños")
+    emergency_contact = models.CharField(max_length=300, blank=True, null=True, verbose_name="Contacto de emergencia")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de registro")
 
