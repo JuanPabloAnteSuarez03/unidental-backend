@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deudas Vencidas - WhatsApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .whatsapp-btn {
+            background-color: #25D366;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: background-color 0.3s;
+        }
+        
+        .whatsapp-btn:hover {
+            background-color: #1da851;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .whatsapp-btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .urgency-high {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        
+        .urgency-medium {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+        }
+        
+        .urgency-low {
+            background-color: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+        
+        .debt-card {
+            margin-bottom: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .supplier-info {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .contact-info {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .amount-info {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .days-overdue {
+            font-weight: bold;
+        }
+        
+        .message-preview {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                    Deudas Vencidas - Recordatorios WhatsApp
+                </h1>
+            </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="stats-card">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h3 id="total-count">-</h3>
+                            <p>Total Deudas</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 id="total-amount">-</h3>
+                            <p>Monto Total</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 id="urgent-count">-</h3>
+                            <p>Urgentes (+15 días)</p>
+                        </div>
+                        <div class="col-md-3">
+                            <h3 id="with-phone-count">-</h3>
+                            <p>Con Teléfono</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <button id="refresh-btn" class="btn btn-primary">
+                    <i class="fas fa-refresh"></i> Actualizar
+                </button>
+                <button id="expand-all-btn" class="btn btn-secondary ms-2">
+                    <i class="fas fa-expand"></i> Expandir Mensajes
+                </button>
+            </div>
+            <div class="col-md-6 text-end">
+                <div class="form-check form-switch d-inline-block me-3">
+                    <input class="form-check-input" type="checkbox" id="only-with-phone" checked>
+                    <label class="form-check-label" for="only-with-phone">
+                        Solo con teléfono
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+
+        <!-- Contenedor de deudas -->
+        <div id="debts-container" class="row" style="display: none;">
+            <!-- Las deudas se cargarán dinámicamente aquí -->
+        </div>
+
+        <!-- Mensaje de no hay deudas -->
+        <div id="no-debts-message" class="alert alert-success text-center" style="display: none;">
+            <i class="fas fa-check-circle"></i>
+            <h4>¡Excelente!</h4>
+            <p>No hay deudas vencidas en este momento.</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let debtsData = [];
+        let showExpandedMessages = false;
+
+        // Función para cargar deudas vencidas
+        async function loadOverdueDebts() {
+            const loadingElement = document.getElementById('loading');
+            const debtsContainer = document.getElementById('debts-container');
+            const noDebtsMessage = document.getElementById('no-debts-message');
+            
+            loadingElement.style.display = 'flex';
+            debtsContainer.style.display = 'none';
+            noDebtsMessage.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/credits/purchase-accounts/overdue_with_whatsapp/');
+                const data = await response.json();
+                
+                debtsData = data.overdue_accounts || [];
+                
+                if (debtsData.length === 0) {
+                    noDebtsMessage.style.display = 'block';
+                } else {
+                    renderDebts();
+                    debtsContainer.style.display = 'block';
+                }
+                
+                updateStats();
+                
+            } catch (error) {
+                console.error('Error cargando deudas:', error);
+                alert('Error al cargar las deudas vencidas. Por favor, inténtalo de nuevo.');
+            } finally {
+                loadingElement.style.display = 'none';
+            }
+        }
+
+        // Función para renderizar las deudas
+        function renderDebts() {
+            const debtsContainer = document.getElementById('debts-container');
+            const onlyWithPhone = document.getElementById('only-with-phone').checked;
+            
+            let filteredDebts = debtsData;
+            if (onlyWithPhone) {
+                filteredDebts = debtsData.filter(debt => debt.has_phone);
+            }
+            
+            debtsContainer.innerHTML = '';
+            
+            filteredDebts.forEach(debt => {
+                const debtCard = createDebtCard(debt);
+                debtsContainer.appendChild(debtCard);
+            });
+        }
+
+        // Función para crear una tarjeta de deuda
+        function createDebtCard(debt) {
+            const colDiv = document.createElement('div');
+            colDiv.className = 'col-12';
+            
+            const urgencyClass = getUrgencyClass(debt.days_overdue);
+            const canSendWhatsApp = debt.has_phone && debt.whatsapp_url;
+            
+            colDiv.innerHTML = `
+                <div class="card debt-card ${urgencyClass}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3">
+                                <div class="supplier-info">${debt.supplier_name}</div>
+                                <div class="contact-info">
+                                    <i class="fas fa-user"></i> ${debt.contact_name}
+                                </div>
+                                <div class="contact-info">
+                                    <i class="fas fa-phone"></i> ${debt.phone || 'Sin teléfono'}
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="amount-info text-success">${formatCurrency(debt.remaining_amount)}</div>
+                                <small class="text-muted">Monto adeudado</small>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-muted">Vencimiento:</div>
+                                <div><strong>${formatDate(debt.next_payment_date)}</strong></div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="days-overdue text-danger">
+                                    ${debt.days_overdue} días
+                                </div>
+                                <small class="text-muted">vencidos</small>
+                            </div>
+                            <div class="col-md-3 text-end">
+                                ${canSendWhatsApp ? `
+                                    <a href="${debt.whatsapp_url}" target="_blank" class="whatsapp-btn">
+                                        <i class="fab fa-whatsapp"></i>
+                                        Enviar Recordatorio
+                                    </a>
+                                ` : `
+                                    <button class="whatsapp-btn" disabled title="Sin número de teléfono">
+                                        <i class="fab fa-whatsapp"></i>
+                                        Sin teléfono
+                                    </button>
+                                `}
+                                <button class="btn btn-outline-secondary btn-sm ms-2" onclick="toggleMessage(${debt.id})">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="message-${debt.id}" class="message-preview" style="display: none;">
+                            <strong>Mensaje sugerido:</strong><br>
+                            ${debt.whatsapp_message}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return colDiv;
+        }
+
+        // Función para determinar la clase de urgencia
+        function getUrgencyClass(daysOverdue) {
+            if (daysOverdue > 15) return 'urgency-high';
+            if (daysOverdue > 7) return 'urgency-medium';
+            return 'urgency-low';
+        }
+
+        // Función para formatear moneda
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Función para formatear fecha
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-CO');
+        }
+
+        // Función para mostrar/ocultar mensaje
+        function toggleMessage(debtId) {
+            const messageElement = document.getElementById(`message-${debtId}`);
+            if (messageElement.style.display === 'none') {
+                messageElement.style.display = 'block';
+            } else {
+                messageElement.style.display = 'none';
+            }
+        }
+
+        // Función para actualizar estadísticas
+        function updateStats() {
+            const totalCount = debtsData.length;
+            const totalAmount = debtsData.reduce((sum, debt) => sum + parseFloat(debt.remaining_amount), 0);
+            const urgentCount = debtsData.filter(debt => debt.days_overdue > 15).length;
+            const withPhoneCount = debtsData.filter(debt => debt.has_phone).length;
+            
+            document.getElementById('total-count').textContent = totalCount;
+            document.getElementById('total-amount').textContent = formatCurrency(totalAmount);
+            document.getElementById('urgent-count').textContent = urgentCount;
+            document.getElementById('with-phone-count').textContent = withPhoneCount;
+        }
+
+        // Event listeners
+        document.getElementById('refresh-btn').addEventListener('click', loadOverdueDebts);
+        
+        document.getElementById('expand-all-btn').addEventListener('click', function() {
+            showExpandedMessages = !showExpandedMessages;
+            const messages = document.querySelectorAll('.message-preview');
+            messages.forEach(message => {
+                message.style.display = showExpandedMessages ? 'block' : 'none';
+            });
+            this.innerHTML = showExpandedMessages ? 
+                '<i class="fas fa-compress"></i> Ocultar Mensajes' : 
+                '<i class="fas fa-expand"></i> Expandir Mensajes';
+        });
+        
+        document.getElementById('only-with-phone').addEventListener('change', renderDebts);
+
+        // Cargar deudas al cargar la página
+        document.addEventListener('DOMContentLoaded', loadOverdueDebts);
+    </script>
+</body>
+</html> 

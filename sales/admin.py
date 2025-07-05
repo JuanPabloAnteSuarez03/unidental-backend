@@ -4,9 +4,22 @@ from .models import Customer, Sale, SaleItem, Return, ReturnItem
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ['name', 'phone', 'email', 'created_at']
-    search_fields = ['name', 'email', 'phone']
-    list_filter = ['created_at']
+    list_display = ['name', 'phone', 'email', 'birthday', 'created_at']
+    search_fields = ['name', 'email', 'phone', 'address', 'emergency_contact']
+    list_filter = ['created_at', 'birthday']
+    fieldsets = (
+        ('Información Personal', {
+            'fields': ('name', 'phone', 'email', 'birthday')
+        }),
+        ('Ubicación y Contacto', {
+            'fields': ('address', 'emergency_contact')
+        }),
+        ('Notas Adicionales', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at']
 
 
 class SaleItemInline(admin.TabularInline):
