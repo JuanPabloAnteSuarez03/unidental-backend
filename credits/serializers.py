@@ -3,6 +3,8 @@ from decimal import Decimal
 from .models import CreditAccount, CreditPayment
 from sales.models import Sale
 from sales.serializers import SaleSerializer
+from purchases.models import PurchaseOrder
+from .models import CreditPurchaseAccount, CreditPurchasePayment
 
 
 class CreditPaymentSerializer(serializers.ModelSerializer):
@@ -154,4 +156,67 @@ class DebtSummarySerializer(serializers.Serializer):
     total_debt = serializers.DecimalField(max_digits=12, decimal_places=2)
     overdue_debt = serializers.DecimalField(max_digits=12, decimal_places=2)
     active_credits_count = serializers.IntegerField()
-    overdue_credits_count = serializers.IntegerField() 
+    overdue_credits_count = serializers.IntegerField()
+
+
+# =============================
+# SERIALIZADORES PARA COMPRAS A CRÉDITO
+# =============================
+
+class CreditPurchasePaymentSerializer(serializers.ModelSerializer):
+    """Serializador para abonos de crédito de compra."""
+    class Meta:
+        model = CreditPurchasePayment
+        fields = [
+            'id', 'credit_account', 'amount_paid', 'payment_date', 'payment_method',
+            'reference_number', 'notes', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+    def validate(self, data):
+        credit_account = data.get('credit_account') or (self.instance.credit_account if self.instance else None)
+        amount_paid = data.get('amount_paid')
+        if credit_account and amount_paid and amount_paid > credit_account.remaining_amount:
+            raise serializers.ValidationError({
+                'amount_paid': f'El monto pagado no puede exceder el monto pendiente: ${credit_account.remaining_amount}'
+            })
+        return data
+
+
+class CreditPurchaseAccountSerializer(serializers.ModelSerializer):
+    """Serializador para cuentas de crédito de compra."""
+
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+    payments = CreditPurchasePaymentSerializer(many=True, read_only=True)
+
+    is_fully_paid = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+    total_paid = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CreditPurchaseAccount
+        fields = [
+            'id', 'purchase_order', 'supplier_name', 'original_amount', 'remaining_amount',
+            'start_date', 'payment_frequency', 'next_payment_date', 'payment_amount', 'grace_days',
+            'is_active', 'notes', 'created_at', 'updated_at',
+            'payments', 'is_fully_paid', 'is_overdue', 'total_paid'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'remaining_amount']
+
+    def get_is_fully_paid(self, obj):
+        return obj.is_fully_paid
+
+    def get_is_overdue(self, obj):
+        return obj.is_overdue
+
+    def get_total_paid(self, obj):
+        return obj.total_paid
+
+    def validate_purchase_order(self, value):
+        if hasattr(value, 'credit_account'):
+            raise serializers.ValidationError("Esta orden de compra ya tiene una cuenta de crédito asociada.")
+        return value
+
+    def create(self, validated_data):
+        validated_data['remaining_amount'] = validated_data['original_amount']
+        return super().create(validated_data) 

@@ -16,6 +16,7 @@ from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location, InventoryStock, InventoryMovement
 from sales.models import Customer, Sale, SaleItem, Return, ReturnItem, update_inventory_on_return_item_delete, update_return_total
 from credits.models import CreditAccount, CreditPayment
+from purchases.models import PurchaseOrder, PurchaseOrderItem
 
 
 class Command(BaseCommand):
@@ -53,6 +54,11 @@ class Command(BaseCommand):
             action='store_true',
             help='Mostrar qué se haría sin realizar cambios en la base de datos'
         )
+        parser.add_argument(
+            '--orders-only',
+            action='store_true',
+            help='Crear únicamente órdenes de compra e ítems a partir de opciones existentes (sin modificar otras entidades)'
+        )
 
     def __init__(self):
         super().__init__()
@@ -73,6 +79,8 @@ class Command(BaseCommand):
             'suppliers': 0,
             'locations': 0,
             'purchase_options': 0,
+            'purchase_orders': 0,
+            'purchase_order_items': 0,
             'inventory_stock': 0,
             'inventory_movements': 0,
             'customers': 0,
@@ -297,16 +305,30 @@ class Command(BaseCommand):
 
     def _extract_supplier_name(self, supplier_str):
         """
-        Extrae y limpia el nombre del proveedor.
+        Extrae y normaliza el nombre del proveedor del string del CSV.
+        Ahora busca coincidencias con proveedores existentes primero.
         """
-        if not supplier_str:
+        if not supplier_str or supplier_str.strip() in ['', 'N/A', 'NO APLICA']:
             return None
+
+        supplier_str = supplier_str.strip().upper()
         
-        # Dividir por espacios y tomar la primera parte principal
-        supplier_parts = supplier_str.upper().split()
+        # Palabras a excluir del procesamiento
+        exclude_words = {'Y', 'LA', 'EL', 'DE', 'DEL', 'LAS', 'LOS', 'CON', 'PARA', 'POR', 'EN'}
         
-        # Filtrar palabras comunes que no son nombres de proveedores
-        exclude_words = {'Y', 'E', 'DE', 'LA', 'EL', 'LAS', 'LOS', 'CON', 'SIN', 'PARA'}
+        # Primero, buscar coincidencia exacta con proveedores existentes
+        existing_suppliers = Supplier.objects.all()
+        for existing_supplier in existing_suppliers:
+            if existing_supplier.name.upper() == supplier_str:
+                return existing_supplier.name
+        
+        # Buscar coincidencias parciales con proveedores existentes
+        supplier_match = self._find_best_supplier_match(supplier_str, existing_suppliers)
+        if supplier_match:
+            return supplier_match
+        
+        # Si no hay coincidencia, extraer el primer nombre significativo como antes
+        supplier_parts = supplier_str.split()
         main_supplier = None
         
         for part in supplier_parts:
@@ -315,6 +337,58 @@ class Command(BaseCommand):
                 break
         
         return main_supplier if main_supplier else supplier_str[:20].upper()
+
+    def _find_best_supplier_match(self, supplier_str, existing_suppliers):
+        """
+        Encuentra la mejor coincidencia entre proveedores existentes usando diferentes estrategias.
+        """
+        supplier_str_clean = supplier_str.upper()
+        
+        # Lista de nombres de proveedores existentes para comparar
+        existing_names = [s.name for s in existing_suppliers]
+        
+        # Estrategia 1: Coincidencia por contenido (el proveedor existente está contenido en el string)
+        for existing in existing_names:
+            if existing.upper() in supplier_str_clean:
+                return existing
+        
+        # Estrategia 2: Coincidencia inversa (el string está contenido en el proveedor existente)
+        for existing in existing_names:
+            if supplier_str_clean in existing.upper():
+                return existing
+        
+        # Estrategia 3: Coincidencia por palabras clave
+        supplier_words = set(supplier_str_clean.split())
+        best_match = None
+        best_score = 0
+        
+        for existing in existing_names:
+            existing_words = set(existing.upper().split())
+            common_words = supplier_words.intersection(existing_words)
+            
+            # Calcular puntuación de coincidencia
+            if common_words:
+                score = len(common_words) / len(existing_words.union(supplier_words))
+                if score > best_score and score > 0.3:  # Umbral mínimo del 30%
+                    best_score = score
+                    best_match = existing
+        
+        # Estrategia 4: Mapeo manual para casos específicos conocidos
+        manual_mappings = {
+            'CENTRO': 'CENTRO 40mil',  # Si aparece solo "CENTRO", usar "CENTRO 40mil"
+            'DENTAL': 'DENTAL MARKET',  # Si aparece solo "DENTAL", usar "DENTAL MARKET"
+            'CRISTALERIA': 'CENTRO CRISTALERIA LA 13',
+            'DROGERIA': 'DROGUERIA SAN JORGE',
+            'DROGUERIA': 'DROGUERIA SAN JORGE',
+        }
+        
+        # Verificar si los proveedores del mapeo manual existen
+        existing_names_set = set(existing_names)
+        for key, mapped_supplier in manual_mappings.items():
+            if key in supplier_str_clean and mapped_supplier in existing_names_set:
+                return mapped_supplier
+        
+        return best_match
 
     def _get_or_create_category(self, name):
         """
@@ -549,12 +623,94 @@ class Command(BaseCommand):
         
         return created_customers
 
+    def _create_purchase_orders_only(self):
+        """Genera órdenes de compra basadas en las PurchaseOptions almacenadas."""
+        self.stdout.write("📝 Creando solo órdenes de compra a partir de opciones existentes…")
+        
+        # Obtener opciones de compra que no tienen items asociados
+        purchase_options = PurchaseOption.objects.select_related('product', 'supplier').filter(
+            id__in=PurchaseOption.objects.exclude(
+                id__in=PurchaseOrderItem.objects.values_list('purchase_option_id', flat=True)
+            )
+        )
+        
+        if not purchase_options.exists():
+            self.stdout.write("ℹ️  No hay opciones de compra sin órdenes asociadas.")
+            return
+            
+        # Asegurar ubicaciones
+        sede = Location.objects.filter(name__icontains='Sede').first()
+        if not sede:
+            sede = Location.objects.create(name='Sede Principal', type='sede', address='Dirección Principal')
+        
+        # Agrupar por proveedor
+        orders_by_supplier = {}
+        from django.db.models import Sum
+        
+        for po in purchase_options:
+            if po.supplier_id not in orders_by_supplier:
+                orders_by_supplier[po.supplier_id] = {
+                    'supplier': po.supplier,
+                    'items': []
+                }
+            
+            # Calcular cantidad según stock actual del producto
+            total_qty = InventoryStock.objects.filter(product=po.product).aggregate(total=Sum('quantity'))['total'] or 1
+            orders_by_supplier[po.supplier_id]['items'].append({
+                'purchase_option': po,
+                'quantity': max(total_qty, 1)
+            })
+        
+        # Crear órdenes en lote
+        orders_to_create = []
+        for supplier_id, order_data in orders_by_supplier.items():
+            order = PurchaseOrder(
+                supplier=order_data['supplier'],
+                destination=sede,
+                order_date=date.today(),
+                status='pending',
+                notes='Orden generada por --orders-only'
+            )
+            orders_to_create.append(order)
+        
+        self.stdout.write(f"📋 Creando {len(orders_to_create)} órdenes de compra...")
+        created_orders = PurchaseOrder.objects.bulk_create(orders_to_create)
+        
+        # Crear mapa de órdenes por supplier_id
+        order_map = {order.supplier_id: order for order in created_orders}
+        
+        # Crear items en lote
+        items_to_create = []
+        for supplier_id, order_data in orders_by_supplier.items():
+            order = order_map.get(supplier_id)
+            if order:
+                for item_data in order_data['items']:
+                    item = PurchaseOrderItem(
+                        order=order,
+                        purchase_option=item_data['purchase_option'],
+                        quantity_requested=item_data['quantity'],
+                        unit_price=item_data['purchase_option'].purchase_price
+                    )
+                    items_to_create.append(item)
+        
+        self.stdout.write(f"🛒 Creando {len(items_to_create)} items de órdenes...")
+        PurchaseOrderItem.objects.bulk_create(items_to_create, batch_size=500)
+        
+        # Marcar todas las órdenes como recibidas
+        self.stdout.write("✅ Marcando órdenes como recibidas...")
+        for order in created_orders:
+            order.mark_as_received()
+        
+        self.stats['purchase_orders'] = len(created_orders)
+        self.stats['purchase_order_items'] = len(items_to_create)
+
     def handle(self, *args, **options):
         csv_file = options['csv_file']
         clear_data = options['clear_data']
         create_demo = options['create_demo_data']
         only_missing = options['only_missing']
         dry_run = options['dry_run']
+        orders_only = options.get('orders_only')
         
         # Verificar que el archivo existe
         if not os.path.exists(csv_file):
@@ -693,6 +849,37 @@ class Command(BaseCommand):
                                         
                                         if created:
                                             self.stats['purchase_options'] += 1
+
+                                        # Crear orden de compra e item asociado
+                                        try:
+                                            dest_location = sede_sur or sede_norte
+                                            if not dest_location:
+                                                dest_location = Location.objects.first()
+                                            order = PurchaseOrder.objects.create(
+                                                supplier=supplier,
+                                                destination=dest_location,
+                                                order_date=date.today(),
+                                                status='pending',  # pendiente para poder agregar ítems
+                                                notes='Orden generada automáticamente por el script de población'
+                                            )
+                                            self.stats['purchase_orders'] += 1
+
+                                            quantity = max(data['stock_sur'] + data['stock_norte'], 1)
+                                            PurchaseOrderItem.objects.create(
+                                                order=order,
+                                                purchase_option=purchase_option,
+                                                quantity_requested=quantity,
+                                                unit_price=purchase_option.purchase_price
+                                            )
+                                            self.stats['purchase_order_items'] += 1
+
+                                            # Marcar la orden como recibida después de agregar ítems
+                                            try:
+                                                order.mark_as_received()
+                                            except Exception:
+                                                pass
+                                        except Exception as oe:
+                                            self.errors.append(f"Error creando orden de compra para {product.name}: {oe}")
                                 
                                 # Crear stock inicial
                                 if data['stock_sur'] > 0 and sede_sur:
@@ -856,6 +1043,8 @@ class Command(BaseCommand):
         self.stdout.write(f"🏢 Proveedores creados: {self.stats['suppliers']}")
         self.stdout.write(f"📍 Ubicaciones creadas: {self.stats['locations']}")
         self.stdout.write(f"💰 Opciones de compra creadas: {self.stats['purchase_options']}")
+        self.stdout.write(f"📑 Órdenes de compra creadas: {self.stats['purchase_orders']}")
+        self.stdout.write(f"🛒 Ítems de órdenes creados: {self.stats['purchase_order_items']}")
         self.stdout.write(f"📊 Stocks de inventario creados: {self.stats['inventory_stock']}")
         self.stdout.write(f"📈 Movimientos de inventario creados: {self.stats['inventory_movements']}")
         self.stdout.write(f"👥 Clientes creados: {self.stats['customers']}")

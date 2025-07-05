@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from catalogs.models import Category, Product, ProductBatch, ProductComponent
 from inventory.models import Location, InventoryStock, InventoryMovement
 import random
+from decimal import Decimal
 
 
 class Command(BaseCommand):
@@ -177,6 +178,7 @@ class Command(BaseCommand):
                 category=category,
                 product_type='simple',
                 requires_batch_control=True,
+                sale_price=self._generate_sale_price(),
                 **product_data
             )
             
@@ -221,6 +223,7 @@ class Command(BaseCommand):
                 category=category,
                 product_type='simple',
                 requires_batch_control=False,
+                sale_price=self._generate_sale_price(),
                 **product_data
             )
             products.append(product)
@@ -264,6 +267,7 @@ class Command(BaseCommand):
                 category=component_category,
                 product_type='component',
                 requires_batch_control=True,  # Los componentes también pueden requerir lotes
+                sale_price=self._generate_sale_price(),
                 **comp_data
             )
             component_products.append(component)
@@ -316,6 +320,7 @@ class Command(BaseCommand):
                 category=kit_category,
                 product_type='composite',
                 requires_batch_control=False,  # Los compuestos generalmente no tienen lotes propios
+                sale_price=self._generate_sale_price(),
                 **comp_data
             )
             
@@ -426,4 +431,10 @@ class Command(BaseCommand):
                         self.stdout.write(
                             f'  ✓ Stock creado: {product.name} - {location.name}: '
                             f'{quantity} {product.unit}'
-                        ) 
+                        )
+
+    def _generate_sale_price(self, min_value=5000, max_value=500000):
+        """Genera un precio de venta aleatorio dentro del rango especificado (COP)."""
+        value = random.randint(min_value, max_value)
+        cents = random.randint(0, 99)
+        return Decimal(f"{value}.{cents:02d}") 

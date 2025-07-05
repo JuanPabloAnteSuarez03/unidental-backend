@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import CreditAccount, CreditPayment
+from .models import (CreditAccount, CreditPayment, 
+                     CreditPurchaseAccount, CreditPurchasePayment, CreditPurchaseReminder)
 
 
 class CreditPaymentInline(admin.TabularInline):
@@ -104,3 +105,91 @@ class CreditPaymentAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """Permite eliminar pagos pero con cuidado."""
         return True
+
+
+# ======================================================
+# ADMINISTRACIÓN PARA COMPRAS A CRÉDITO
+# ======================================================
+
+
+class CreditPurchasePaymentInline(admin.TabularInline):
+    """Inline para mostrar abonos en la cuenta de crédito de compra."""
+    model = CreditPurchasePayment
+    extra = 0
+    readonly_fields = ['created_at']
+    fields = ['amount_paid', 'payment_date', 'payment_method', 'reference_number', 'notes', 'created_at']
+
+
+@admin.register(CreditPurchaseAccount)
+class CreditPurchaseAccountAdmin(admin.ModelAdmin):
+    """Administración de cuentas de crédito de compra."""
+    list_display = [
+        'id', 'supplier_name', 'original_amount', 'remaining_amount',
+        'start_date', 'payment_frequency', 'next_payment_date', 'is_fully_paid', 'is_overdue'
+    ]
+    list_filter = ['payment_frequency', 'start_date', 'next_payment_date', 'created_at']
+    search_fields = ['purchase_order__supplier__name', 'purchase_order__id']
+    readonly_fields = ['created_at', 'updated_at', 'is_fully_paid', 'is_overdue', 'total_paid']
+    fieldsets = (
+        ('Información de la Orden de Compra', {
+            'fields': ('purchase_order',)
+        }),
+        ('Información del Crédito', {
+            'fields': (
+                'original_amount', 'remaining_amount', 'payment_frequency', 'payment_amount',
+                'start_date', 'next_payment_date', 'grace_days', 'is_active', 'notes'
+            )
+        }),
+        ('Estado del Crédito', {
+            'fields': ('is_fully_paid', 'is_overdue', 'total_paid'),
+            'classes': ('collapse',)
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    inlines = [CreditPurchasePaymentInline]
+
+    def supplier_name(self, obj):
+        return obj.supplier.name
+    supplier_name.short_description = "Proveedor"
+    supplier_name.admin_order_field = 'purchase_order__supplier__name'
+
+
+@admin.register(CreditPurchasePayment)
+class CreditPurchasePaymentAdmin(admin.ModelAdmin):
+    """Administración de abonos de crédito de compra."""
+    list_display = [
+        'id', 'credit_account', 'supplier_name', 'amount_paid', 'payment_date', 'payment_method', 'created_at'
+    ]
+    list_filter = ['payment_date', 'payment_method', 'created_at']
+    search_fields = ['credit_account__purchase_order__supplier__name', 'credit_account__id', 'reference_number', 'notes']
+    readonly_fields = ['created_at']
+    fieldsets = (
+        ('Información del Pago', {
+            'fields': (
+                'credit_account', 'amount_paid', 'payment_date', 'payment_method', 'reference_number', 'notes'
+            )
+        }),
+        ('Metadatos', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def supplier_name(self, obj):
+        return obj.credit_account.supplier.name
+    supplier_name.short_description = "Proveedor"
+    supplier_name.admin_order_field = 'credit_account__purchase_order__supplier__name'
+
+
+@admin.register(CreditPurchaseReminder)
+class CreditPurchaseReminderAdmin(admin.ModelAdmin):
+    """Administración de recordatorios de crédito de compra."""
+    list_display = [
+        'id', 'credit_account', 'reminder_type', 'status', 'scheduled_date', 'sent_date', 'retry_count'
+    ]
+    list_filter = ['reminder_type', 'status', 'scheduled_date', 'created_at']
+    search_fields = ['credit_account__purchase_order__supplier__name', 'message_content', 'error_message']
+    readonly_fields = ['sent_date', 'whatsapp_message_id', 'error_message', 'retry_count', 'created_at']
