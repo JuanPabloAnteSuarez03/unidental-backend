@@ -55,7 +55,8 @@ def generate_whatsapp_url(phone_number, message):
     # Codificar el mensaje para URL
     encoded_message = quote(message)
     
-    return f"https://wa.me/{clean_phone}?text={encoded_message}"
+    # Utilizar enlace directo a WhatsApp Web (funciona tanto en móvil como en PC)
+    return f"https://web.whatsapp.com/send?phone={clean_phone}&text={encoded_message}"
 
 
 class CreditAccountViewSet(viewsets.ModelViewSet):
