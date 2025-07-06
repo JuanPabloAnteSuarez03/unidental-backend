@@ -17,10 +17,11 @@ class CreditAccountAdmin(admin.ModelAdmin):
     
     list_display = [
         'id', 'customer_name', 'original_amount', 'remaining_amount', 
-        'start_date', 'due_date', 'is_fully_paid', 'is_overdue'
+        'start_date', 'due_date', 'next_payment_date', 'installments_count', 
+        'is_fully_paid', 'is_overdue'
     ]
     list_filter = [
-        'start_date', 'due_date', 'created_at'
+        'start_date', 'due_date', 'next_payment_date', 'payment_frequency', 'created_at'
     ]
     search_fields = [
         'sale__customer__name', 'sale__customer__email', 
@@ -28,7 +29,8 @@ class CreditAccountAdmin(admin.ModelAdmin):
     ]
     readonly_fields = [
         'created_at', 'updated_at', 'is_fully_paid', 
-        'is_overdue', 'total_paid'
+        'is_overdue', 'total_paid', 'payments_made_count', 
+        'remaining_installments', 'payment_progress_percentage'
     ]
     fieldsets = (
         ('Información de la Venta', {
@@ -37,8 +39,13 @@ class CreditAccountAdmin(admin.ModelAdmin):
         ('Información del Crédito', {
             'fields': ('original_amount', 'remaining_amount', 'start_date', 'due_date')
         }),
+        ('Configuración de Cuotas', {
+            'fields': ('payment_frequency', 'installments_count', 'installment_amount', 'next_payment_date'),
+            'classes': ('collapse',)
+        }),
         ('Estado del Crédito', {
-            'fields': ('is_fully_paid', 'is_overdue', 'total_paid'),
+            'fields': ('is_fully_paid', 'is_overdue', 'total_paid', 'payments_made_count', 
+                      'remaining_installments', 'payment_progress_percentage'),
             'classes': ('collapse',)
         }),
         ('Metadatos', {

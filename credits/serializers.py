@@ -50,14 +50,19 @@ class CreditAccountSerializer(serializers.ModelSerializer):
     is_fully_paid = serializers.SerializerMethodField()
     is_overdue = serializers.SerializerMethodField()
     total_paid = serializers.SerializerMethodField()
+    payments_made_count = serializers.SerializerMethodField()
+    remaining_installments = serializers.SerializerMethodField()
+    payment_progress_percentage = serializers.SerializerMethodField()
     
     class Meta:
         model = CreditAccount
         fields = [
             'id', 'sale', 'sale_details', 'customer_name', 'customer_phone', 
             'customer_email', 'original_amount', 'remaining_amount', 
-            'start_date', 'due_date', 'created_at', 'updated_at',
-            'payments', 'is_fully_paid', 'is_overdue', 'total_paid'
+            'start_date', 'due_date', 'payment_frequency', 'installments_count',
+            'installment_amount', 'next_payment_date', 'created_at', 'updated_at',
+            'payments', 'is_fully_paid', 'is_overdue', 'total_paid',
+            'payments_made_count', 'remaining_installments', 'payment_progress_percentage'
         ]
         read_only_fields = ['created_at', 'updated_at', 'remaining_amount']
 
@@ -72,6 +77,18 @@ class CreditAccountSerializer(serializers.ModelSerializer):
     def get_total_paid(self, obj):
         """Obtiene el total pagado."""
         return obj.total_paid
+
+    def get_payments_made_count(self, obj):
+        """Obtiene el número de pagos realizados."""
+        return obj.payments_made_count
+
+    def get_remaining_installments(self, obj):
+        """Obtiene el número de cuotas restantes."""
+        return obj.remaining_installments
+
+    def get_payment_progress_percentage(self, obj):
+        """Obtiene el porcentaje de progreso de pagos."""
+        return obj.payment_progress_percentage
 
     def validate_sale(self, value):
         """Valida que la venta no tenga ya una cuenta de crédito."""
@@ -106,6 +123,36 @@ class CreateCreditAccountSerializer(serializers.Serializer):
     original_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'))
     due_date = serializers.DateField(required=False, allow_null=True)
     
+    # Campos para cuotas (opcionales)
+    payment_frequency = serializers.ChoiceField(
+        choices=[
+            ('weekly', 'Semanal'),
+            ('biweekly', 'Quincenal'),
+            ('monthly', 'Mensual'),
+            ('quarterly', 'Trimestral'),
+            ('custom', 'Personalizado'),
+        ],
+        default='monthly',
+        required=False
+    )
+    installments_count = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    installment_amount = serializers.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        min_value=Decimal('0.01'), 
+        required=False, 
+        allow_null=True
+    )
+    next_payment_date = serializers.DateField(required=False, allow_null=True)
+    initial_payment = serializers.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        min_value=Decimal('0.01'), 
+        required=False, 
+        allow_null=True,
+        help_text="Monto del pago inicial al crear el crédito"
+    )
+    
     def validate_sale_id(self, value):
         """Valida que la venta exista y no tenga ya una cuenta de crédito."""
         try:
@@ -121,7 +168,7 @@ class CreateCreditAccountSerializer(serializers.Serializer):
         return value
 
     def validate(self, data):
-        """Valida que el monto no exceda el total de la venta."""
+        """Valida que el monto no exceda el total de la venta y valida cuotas."""
         sale = Sale.objects.get(id=data['sale_id'])
         original_amount = data['original_amount']
         
@@ -130,18 +177,78 @@ class CreateCreditAccountSerializer(serializers.Serializer):
                 'original_amount': f'El monto de crédito no puede exceder el total de la venta: ${sale.total_net}'
             })
         
+        # Validar cuotas si están presentes
+        installments_count = data.get('installments_count')
+        installment_amount = data.get('installment_amount')
+        
+        if installments_count and installment_amount:
+            total_installments = installments_count * installment_amount
+            if total_installments != original_amount:
+                raise serializers.ValidationError({
+                    'installment_amount': f'El total de cuotas (${total_installments}) debe ser igual al monto original (${original_amount})'
+                })
+        
+        # Si se especifica número de cuotas pero no el monto, calcularlo automáticamente
+        if installments_count and not installment_amount:
+            data['installment_amount'] = original_amount / installments_count
+        
+        # Validar pago inicial
+        initial_payment = data.get('initial_payment')
+        if initial_payment:
+            if initial_payment >= original_amount:
+                raise serializers.ValidationError({
+                    'initial_payment': 'El pago inicial no puede ser mayor o igual al monto total del crédito'
+                })
+            
+            # Si hay cuotas configuradas, recalcular el monto de cuotas con el saldo restante
+            if installments_count and installment_amount:
+                remaining_after_initial = original_amount - initial_payment
+                expected_installment = remaining_after_initial / installments_count
+                if abs(installment_amount - expected_installment) > Decimal('0.01'):
+                    raise serializers.ValidationError({
+                        'installment_amount': f'Con el pago inicial de ${initial_payment}, cada cuota debería ser ${expected_installment:.2f}'
+                    })
+            
+            # Si hay cuotas pero no monto especificado, calcularlo con el saldo restante
+            elif installments_count and not data.get('installment_amount'):
+                remaining_after_initial = original_amount - initial_payment
+                data['installment_amount'] = remaining_after_initial / installments_count
+        
         return data
 
     def create(self, validated_data):
-        """Crea la cuenta de crédito."""
-        sale = Sale.objects.get(id=validated_data['sale_id'])
+        """Crea la cuenta de crédito y registra el pago inicial si existe."""
+        from django.db import transaction
         
-        credit_account = CreditAccount.objects.create(
-            sale=sale,
-            original_amount=validated_data['original_amount'],
-            remaining_amount=validated_data['original_amount'],
-            due_date=validated_data.get('due_date')
-        )
+        sale = Sale.objects.get(id=validated_data['sale_id'])
+        initial_payment = validated_data.get('initial_payment')
+        
+        with transaction.atomic():
+            # Crear la cuenta de crédito
+            credit_account = CreditAccount.objects.create(
+                sale=sale,
+                original_amount=validated_data['original_amount'],
+                remaining_amount=validated_data['original_amount'],
+                due_date=validated_data.get('due_date'),
+                payment_frequency=validated_data.get('payment_frequency', 'monthly'),
+                installments_count=validated_data.get('installments_count'),
+                installment_amount=validated_data.get('installment_amount'),
+                next_payment_date=validated_data.get('next_payment_date')
+            )
+            
+            # Si hay pago inicial, registrarlo automáticamente
+            if initial_payment:
+                from .models import CreditPayment
+                from datetime import date
+                
+                CreditPayment.objects.create(
+                    credit_account=credit_account,
+                    amount_paid=initial_payment,
+                    payment_date=date.today(),
+                    notes="Pago inicial registrado automáticamente al crear el crédito"
+                )
+                
+                # El remaining_amount se actualiza automáticamente por el método save() de CreditPayment
         
         return credit_account
 
