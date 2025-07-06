@@ -60,7 +60,7 @@ class CreditAccountSerializer(serializers.ModelSerializer):
             'id', 'sale', 'sale_details', 'customer_name', 'customer_phone', 
             'customer_email', 'original_amount', 'remaining_amount', 
             'start_date', 'due_date', 'payment_frequency', 'installments_count',
-            'installment_amount', 'next_payment_date', 'created_at', 'updated_at',
+            'installment_amount', 'next_payment_date', 'initial_payment', 'created_at', 'updated_at',
             'payments', 'is_fully_paid', 'is_overdue', 'total_paid',
             'payments_made_count', 'remaining_installments', 'payment_progress_percentage'
         ]
@@ -177,47 +177,32 @@ class CreateCreditAccountSerializer(serializers.Serializer):
                 'original_amount': f'El monto de crédito no puede exceder el total de la venta: ${sale.total_net}'
             })
         
-        # Validar cuotas si están presentes
+        # Validar cuotas y pago inicial - SIMPLIFICADO
         installments_count = data.get('installments_count')
         installment_amount = data.get('installment_amount')
-        
-        if installments_count and installment_amount:
-            total_installments = installments_count * installment_amount
-            # Permitir diferencia de hasta 1 peso por redondeo
-            difference = abs(total_installments - original_amount)
-            if difference > Decimal('1.00'):
-                raise serializers.ValidationError({
-                    'installment_amount': f'El total de cuotas (${total_installments}) debe ser aproximadamente igual al monto original (${original_amount}). Diferencia: ${difference}'
-                })
-        
-        # Si se especifica número de cuotas pero no el monto, calcularlo automáticamente
-        if installments_count and not installment_amount:
-            data['installment_amount'] = original_amount / installments_count
+        initial_payment = data.get('initial_payment', Decimal('0'))
         
         # Validar pago inicial
-        initial_payment = data.get('initial_payment')
-        if initial_payment:
-            if initial_payment >= original_amount:
+        if initial_payment >= original_amount:
+            raise serializers.ValidationError({
+                'initial_payment': 'El pago inicial no puede ser mayor o igual al monto total del crédito'
+            })
+        
+        # Validar que cuotas + pago inicial = monto original (con tolerancia)
+        if installments_count and installment_amount:
+            total_installments = installments_count * installment_amount
+            total_with_initial = total_installments + initial_payment
+            difference = abs(total_with_initial - original_amount)
+            
+            if difference > Decimal('1.00'):
                 raise serializers.ValidationError({
-                    'initial_payment': 'El pago inicial no puede ser mayor o igual al monto total del crédito'
+                    'installment_amount': f'Pago inicial (${initial_payment}) + Total cuotas (${total_installments}) = ${total_with_initial} debe aproximarse al monto original (${original_amount}). Diferencia: ${difference}'
                 })
-            
-            # Si hay cuotas configuradas, recalcular el monto de cuotas con el saldo restante
-            if installments_count and installment_amount:
-                remaining_after_initial = original_amount - initial_payment
-                total_installments_check = installments_count * installment_amount
-                # Permitir diferencia de hasta 1 peso por redondeo
-                difference = abs(total_installments_check - remaining_after_initial)
-                if difference > Decimal('1.00'):
-                    expected_installment = remaining_after_initial / installments_count
-                    raise serializers.ValidationError({
-                        'installment_amount': f'Con el pago inicial de ${initial_payment}, el total de cuotas (${total_installments_check}) debe aproximarse al saldo restante (${remaining_after_initial}). Sugerido: ${expected_installment:.2f} por cuota'
-                    })
-            
-            # Si hay cuotas pero no monto especificado, calcularlo con el saldo restante
-            elif installments_count and not data.get('installment_amount'):
-                remaining_after_initial = original_amount - initial_payment
-                data['installment_amount'] = remaining_after_initial / installments_count
+        
+        # Calcular cuotas automáticamente si no se especifica el monto
+        elif installments_count and not installment_amount:
+            amount_to_finance = original_amount - initial_payment
+            data['installment_amount'] = amount_to_finance / installments_count
         
         return data
 
@@ -238,7 +223,8 @@ class CreateCreditAccountSerializer(serializers.Serializer):
                 payment_frequency=validated_data.get('payment_frequency', 'monthly'),
                 installments_count=validated_data.get('installments_count'),
                 installment_amount=validated_data.get('installment_amount'),
-                next_payment_date=validated_data.get('next_payment_date')
+                next_payment_date=validated_data.get('next_payment_date'),
+                initial_payment=validated_data.get('initial_payment', Decimal('0'))
             )
             
             # Si hay pago inicial, registrarlo automáticamente
