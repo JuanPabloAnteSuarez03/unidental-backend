@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from sales.models import Sale
 from datetime import date, timedelta
+from decimal import Decimal
 
 
 class CreditAccount(models.Model):
@@ -71,6 +72,14 @@ class CreditAccount(models.Model):
         null=True,
         blank=True,
         verbose_name="Próxima fecha de pago"
+    )
+    initial_payment = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0'),
+        validators=[MinValueValidator(0)],
+        verbose_name="Pago inicial",
+        help_text="Monto del pago inicial al crear el crédito"
     )
     
     created_at = models.DateTimeField(
