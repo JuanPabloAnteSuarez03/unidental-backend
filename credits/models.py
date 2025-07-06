@@ -155,6 +155,17 @@ class CreditAccount(models.Model):
         
         self.save()
 
+    def should_update_payment_date(self, payment_amount):
+        """
+        Determina si se debe actualizar la fecha de pago basado en el monto pagado.
+        Solo actualiza si el pago actual es suficiente para completar al menos una cuota.
+        """
+        if not self.installment_amount or not self.next_payment_date:
+            return False
+        
+        # Solo actualizar si el pago actual es mayor o igual al valor de la cuota
+        return payment_amount >= self.installment_amount
+
     @property
     def payments_made_count(self):
         """Número de pagos realizados."""
@@ -219,10 +230,14 @@ class CreditPayment(models.Model):
         super().save(*args, **kwargs)
         self.credit_account.calculate_remaining_amount()
         
-        # Si el crédito tiene cuotas configuradas, calcular próxima fecha de pago
+        # Solo actualizar fecha si se completó al menos una cuota completa
         if (self.credit_account.next_payment_date and 
-            not self.credit_account.is_fully_paid):
-            self.credit_account.calculate_next_payment_date()
+            not self.credit_account.is_fully_paid and
+            self.credit_account.installment_amount):
+            
+            # Verificar si se debe actualizar la fecha de pago
+            if self.credit_account.should_update_payment_date(self.amount_paid):
+                self.credit_account.calculate_next_payment_date()
 
     class Meta:
         verbose_name = "Pago de crédito"
@@ -376,6 +391,17 @@ class CreditPurchaseAccount(models.Model):
         
         self.save()
 
+    def should_update_payment_date(self, payment_amount):
+        """
+        Determina si se debe actualizar la fecha de pago basado en el monto pagado.
+        Solo actualiza si el pago actual es suficiente para completar al menos un pago acordado.
+        """
+        if not self.payment_amount or not self.next_payment_date:
+            return False
+        
+        # Solo actualizar si el pago actual es mayor o igual al monto acordado
+        return payment_amount >= self.payment_amount
+
     class Meta:
         verbose_name = "Cuenta de crédito de compra"
         verbose_name_plural = "Cuentas de crédito de compra"
@@ -443,9 +469,14 @@ class CreditPurchasePayment(models.Model):
         super().save(*args, **kwargs)
         self.credit_account.calculate_remaining_amount()
         
-        # Si el pago está al día, calcular la próxima fecha de pago
-        if self.credit_account.is_active and not self.credit_account.is_fully_paid:
-            self.credit_account.calculate_next_payment_date()
+        # Solo actualizar fecha si se completó al menos un pago acordado
+        if (self.credit_account.is_active and 
+            not self.credit_account.is_fully_paid and
+            self.credit_account.payment_amount):
+            
+            # Verificar si se debe actualizar la fecha de pago
+            if self.credit_account.should_update_payment_date(self.amount_paid):
+                self.credit_account.calculate_next_payment_date()
 
     class Meta:
         verbose_name = "Abono de crédito de compra"
