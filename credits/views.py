@@ -66,7 +66,7 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['sale__customer']  # Solo campos del modelo
     search_fields = ['sale__customer__name', 'sale__customer__email', 'sale__customer__phone']
-    ordering_fields = ['created_at', 'due_date', 'remaining_amount', 'original_amount']
+    ordering_fields = ['created_at', 'due_date', 'next_payment_date', 'remaining_amount', 'original_amount']
 
     def get_queryset(self):
         """Filtros adicionales por query params."""
@@ -102,6 +102,11 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
         - sale_id: ID de la venta
         - original_amount: Monto del crédito
         - due_date: Fecha de vencimiento (opcional)
+        - payment_frequency: Frecuencia de pago (opcional)
+        - installments_count: Número de cuotas (opcional)
+        - installment_amount: Monto por cuota (opcional)
+        - next_payment_date: Próxima fecha de pago (opcional)
+        - initial_payment: Pago inicial (opcional)
         """
         serializer = CreateCreditAccountSerializer(data=request.data)
         if serializer.is_valid():
@@ -176,11 +181,26 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
     def overdue_accounts(self, request):
         """Retorna todas las cuentas de crédito vencidas."""
         overdue_accounts = self.get_queryset().filter(
-            due_date__lt=date.today(),
+            Q(due_date__lt=date.today()) | Q(next_payment_date__lt=date.today()),
             remaining_amount__gt=0
         )
         
         serializer = self.get_serializer(overdue_accounts, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False)
+    def upcoming_payments(self, request):
+        """Retorna cuentas con pagos próximos a vencer."""
+        days = int(request.query_params.get('days', 7))
+        upcoming_date = date.today() + timedelta(days=days)
+        
+        upcoming_accounts = self.get_queryset().filter(
+            next_payment_date__gte=date.today(),
+            next_payment_date__lte=upcoming_date,
+            remaining_amount__gt=0
+        )
+        
+        serializer = self.get_serializer(upcoming_accounts, many=True)
         return Response(serializer.data)
 
     @action(detail=False)

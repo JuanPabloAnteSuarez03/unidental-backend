@@ -37,6 +37,42 @@ class CreditAccount(models.Model):
         blank=True,
         verbose_name="Fecha de vencimiento"
     )
+    
+    # Campos para manejo de cuotas
+    payment_frequency = models.CharField(
+        max_length=20,
+        choices=[
+            ('weekly', 'Semanal'),
+            ('biweekly', 'Quincenal'),
+            ('monthly', 'Mensual'),
+            ('quarterly', 'Trimestral'),
+            ('custom', 'Personalizado'),
+        ],
+        default='monthly',
+        verbose_name="Frecuencia de pago",
+        help_text="Frecuencia de pago acordada para las cuotas"
+    )
+    installments_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Número de cuotas",
+        help_text="Número total de cuotas acordadas"
+    )
+    installment_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(0.01)],
+        null=True,
+        blank=True,
+        verbose_name="Monto de cuota",
+        help_text="Monto acordado para cada cuota"
+    )
+    next_payment_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Próxima fecha de pago"
+    )
+    
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Fecha de creación"
@@ -58,6 +94,10 @@ class CreditAccount(models.Model):
     @property
     def is_overdue(self):
         """Verifica si el crédito está vencido."""
+        # Si tiene cuotas, verificar por próxima fecha de pago
+        if self.next_payment_date:
+            return date.today() > self.next_payment_date and not self.is_fully_paid
+        # Si no tiene cuotas, verificar por fecha de vencimiento
         if not self.due_date:
             return False
         return date.today() > self.due_date and not self.is_fully_paid
@@ -74,6 +114,56 @@ class CreditAccount(models.Model):
         )['total'] or 0
         self.remaining_amount = max(0, self.original_amount - total_payments)
         self.save()
+
+    def calculate_next_payment_date(self):
+        """Calcula la próxima fecha de pago basada en la frecuencia."""
+        if not self.next_payment_date:
+            return
+        
+        if self.payment_frequency == 'weekly':
+            self.next_payment_date += timedelta(weeks=1)
+        elif self.payment_frequency == 'biweekly':
+            self.next_payment_date += timedelta(weeks=2)
+        elif self.payment_frequency == 'monthly':
+            # Agregar un mes
+            if self.next_payment_date.month == 12:
+                self.next_payment_date = self.next_payment_date.replace(
+                    year=self.next_payment_date.year + 1, month=1
+                )
+            else:
+                self.next_payment_date = self.next_payment_date.replace(
+                    month=self.next_payment_date.month + 1
+                )
+        elif self.payment_frequency == 'quarterly':
+            # Agregar 3 meses
+            month = self.next_payment_date.month + 3
+            year = self.next_payment_date.year
+            if month > 12:
+                month -= 12
+                year += 1
+            self.next_payment_date = self.next_payment_date.replace(year=year, month=month)
+        # Para 'custom', no se actualiza automáticamente
+        
+        self.save()
+
+    @property
+    def payments_made_count(self):
+        """Número de pagos realizados."""
+        return self.payments.count()
+
+    @property
+    def remaining_installments(self):
+        """Número de cuotas restantes."""
+        if not self.installments_count:
+            return None
+        return max(0, self.installments_count - self.payments_made_count)
+
+    @property
+    def payment_progress_percentage(self):
+        """Porcentaje de progreso de pagos."""
+        if not self.installments_count:
+            return None
+        return (self.payments_made_count / self.installments_count) * 100
 
     class Meta:
         verbose_name = "Cuenta de crédito"
@@ -119,6 +209,11 @@ class CreditPayment(models.Model):
         """Actualiza el monto pendiente de la cuenta de crédito al guardar un pago."""
         super().save(*args, **kwargs)
         self.credit_account.calculate_remaining_amount()
+        
+        # Si el crédito tiene cuotas configuradas, calcular próxima fecha de pago
+        if (self.credit_account.next_payment_date and 
+            not self.credit_account.is_fully_paid):
+            self.credit_account.calculate_next_payment_date()
 
     class Meta:
         verbose_name = "Pago de crédito"
