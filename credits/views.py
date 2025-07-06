@@ -275,71 +275,96 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
         Parámetros de consulta:
         - include_upcoming: incluir pagos próximos a vencer (default: true)
         - upcoming_days: días antes del vencimiento para incluir (default: 3)
+        - include_all: incluir TODOS los créditos activos, no solo vencidos/próximos (default: false)
         """
         include_upcoming = request.query_params.get('include_upcoming', 'true').lower() == 'true'
         upcoming_days = int(request.query_params.get('upcoming_days', 3))
+        include_all = request.query_params.get('include_all', 'false').lower() == 'true'
         
-        # Obtener cuentas vencidas (por due_date o next_payment_date)
-        overdue_accounts = self.get_queryset().filter(
-            Q(due_date__lt=date.today()) | Q(next_payment_date__lt=date.today()),
-            remaining_amount__gt=0
-        ).select_related('sale__customer')
-        
-        # Obtener cuentas próximas a vencer si está habilitado
-        upcoming_accounts = []
-        if include_upcoming:
-            upcoming_date = date.today() + timedelta(days=upcoming_days)
-            upcoming_accounts = self.get_queryset().filter(
-                Q(
-                    Q(due_date__gte=date.today(), due_date__lte=upcoming_date) |
-                    Q(next_payment_date__gte=date.today(), next_payment_date__lte=upcoming_date)
-                ),
+        if include_all:
+            # Obtener TODOS los créditos activos (con saldo pendiente)
+            all_accounts = self.get_queryset().filter(
                 remaining_amount__gt=0
             ).select_related('sale__customer')
-        
-        # Combinar ambas consultas
-        all_accounts = list(overdue_accounts) + list(upcoming_accounts)
+        else:
+            # Lógica original: solo vencidos y próximos a vencer
+            # Obtener cuentas vencidas (por due_date o next_payment_date)
+            overdue_accounts = self.get_queryset().filter(
+                Q(due_date__lt=date.today()) | Q(next_payment_date__lt=date.today()),
+                remaining_amount__gt=0
+            ).select_related('sale__customer')
+            
+            # Obtener cuentas próximas a vencer si está habilitado
+            upcoming_accounts = []
+            if include_upcoming:
+                upcoming_date = date.today() + timedelta(days=upcoming_days)
+                upcoming_accounts = self.get_queryset().filter(
+                    Q(
+                        Q(due_date__gte=date.today(), due_date__lte=upcoming_date) |
+                        Q(next_payment_date__gte=date.today(), next_payment_date__lte=upcoming_date)
+                    ),
+                    remaining_amount__gt=0
+                ).select_related('sale__customer')
+            
+            # Combinar ambas consultas
+            all_accounts = list(overdue_accounts) + list(upcoming_accounts)
         
         data = []
         for account in all_accounts:
             customer = account.sale.customer
-            if not customer:
-                continue  # Skip si no hay cliente
-                
             # Determinar fecha de referencia (next_payment_date tiene prioridad)
             reference_date = account.next_payment_date or account.due_date
-            if not reference_date:
-                continue  # Skip si no hay fecha de referencia
-                
-            days_difference = (date.today() - reference_date).days
             
-            # Determinar estado del pago
-            if days_difference > 0:
-                status = 'vencido'
-                status_text = f'{days_difference} días vencido'
-            elif days_difference < 0:
-                status = 'proximo'
-                status_text = f'{abs(days_difference)} días restantes'
+            # Si no hay cliente, usar datos por defecto
+            if not customer:
+                customer_name = "Cliente no especificado"
+                customer_phone = ""
+                customer_email = ""
+                has_phone = False
             else:
-                status = 'hoy'
-                status_text = 'Vence hoy'
+                customer_name = customer.name
+                customer_phone = customer.phone or ""
+                customer_email = customer.email or ""
+                has_phone = bool(customer.phone and customer.phone.strip())
+            
+            # Si no hay fecha de referencia, usar fecha de creación
+            if not reference_date:
+                reference_date = account.created_at.date()
+                days_difference = 0  # No vencido
+                status = 'sin_fecha'
+                status_text = 'Sin fecha de vencimiento'
+            else:
+                days_difference = (date.today() - reference_date).days
+                
+                # Determinar estado del pago
+                if days_difference > 0:
+                    status = 'vencido'
+                    status_text = f'{days_difference} días vencido'
+                elif days_difference < 0:
+                    status = 'proximo'
+                    status_text = f'{abs(days_difference)} días restantes'
+                else:
+                    status = 'hoy'
+                    status_text = 'Vence hoy'
             
             # Generar mensaje personalizado para cliente
             whatsapp_message = self._generate_customer_payment_reminder_message(
-                customer.name, 
+                customer_name, 
                 account.remaining_amount, 
                 reference_date,
                 days_difference
             )
             
-            # Generar URL de WhatsApp
-            whatsapp_url = generate_whatsapp_url(customer.phone, whatsapp_message)
+            # Generar URL de WhatsApp (solo si hay teléfono)
+            whatsapp_url = ""
+            if has_phone:
+                whatsapp_url = generate_whatsapp_url(customer_phone, whatsapp_message)
             
             data.append({
                 'id': account.id,
-                'customer_name': customer.name,
-                'customer_phone': customer.phone,
-                'customer_email': customer.email,
+                'customer_name': customer_name,
+                'customer_phone': customer_phone,
+                'customer_email': customer_email,
                 'remaining_amount': str(account.remaining_amount),
                 'reference_date': reference_date.strftime('%Y-%m-%d'),
                 'days_overdue': days_difference,
@@ -347,7 +372,7 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
                 'status_text': status_text,
                 'whatsapp_url': whatsapp_url,
                 'whatsapp_message': whatsapp_message,
-                'has_phone': bool(customer.phone and customer.phone.strip()),
+                'has_phone': has_phone,
             })
         
         # Ordenar por urgencia: vencidos primero (más días vencidos), luego próximos a vencer
@@ -406,7 +431,7 @@ Cordialmente,
 Departamento de Cartera
 UNIDENTAL"""
         
-        else:
+        elif days_overdue > 5:
             # Mensaje más directo para muchos días vencidos
             message = f"""Estimado/a {customer_name},
 
@@ -422,6 +447,43 @@ Por favor, comuníquese con nosotros para regularizar su situación.
 
 Gracias por su comprensión.
 
+Departamento de Cartera
+UNIDENTAL"""
+        
+        else:
+            # Sin fecha de vencimiento o vence hoy
+            if days_overdue == 0:
+                message = f"""Estimado/a {customer_name},
+
+Reciba un cordial saludo de parte de UNIDENTAL.
+
+Le recordamos que hoy vence su saldo pendiente:
+
+💰 Monto: {formatted_amount}
+📅 Fecha de vencimiento: {formatted_date}
+
+Le solicitamos comedidamente realizar el pago correspondiente hoy mismo.
+
+Si ya realizó el pago, favor hacer caso omiso a este mensaje.
+
+Cordialmente,
+Departamento de Cartera
+UNIDENTAL"""
+            else:
+                # Sin fecha de vencimiento
+                message = f"""Estimado/a {customer_name},
+
+Reciba un cordial saludo de parte de UNIDENTAL.
+
+Le recordamos que tiene un saldo pendiente:
+
+💰 Monto: {formatted_amount}
+
+Le solicitamos comedidamente ponerse en contacto con nosotros para acordar un plan de pagos.
+
+Gracias por su atención.
+
+Cordialmente,
 Departamento de Cartera
 UNIDENTAL"""
         
