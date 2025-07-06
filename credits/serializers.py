@@ -183,9 +183,11 @@ class CreateCreditAccountSerializer(serializers.Serializer):
         
         if installments_count and installment_amount:
             total_installments = installments_count * installment_amount
-            if total_installments != original_amount:
+            # Permitir diferencia de hasta 1 peso por redondeo
+            difference = abs(total_installments - original_amount)
+            if difference > Decimal('1.00'):
                 raise serializers.ValidationError({
-                    'installment_amount': f'El total de cuotas (${total_installments}) debe ser igual al monto original (${original_amount})'
+                    'installment_amount': f'El total de cuotas (${total_installments}) debe ser aproximadamente igual al monto original (${original_amount}). Diferencia: ${difference}'
                 })
         
         # Si se especifica número de cuotas pero no el monto, calcularlo automáticamente
@@ -203,10 +205,13 @@ class CreateCreditAccountSerializer(serializers.Serializer):
             # Si hay cuotas configuradas, recalcular el monto de cuotas con el saldo restante
             if installments_count and installment_amount:
                 remaining_after_initial = original_amount - initial_payment
-                expected_installment = remaining_after_initial / installments_count
-                if abs(installment_amount - expected_installment) > Decimal('0.01'):
+                total_installments_check = installments_count * installment_amount
+                # Permitir diferencia de hasta 1 peso por redondeo
+                difference = abs(total_installments_check - remaining_after_initial)
+                if difference > Decimal('1.00'):
+                    expected_installment = remaining_after_initial / installments_count
                     raise serializers.ValidationError({
-                        'installment_amount': f'Con el pago inicial de ${initial_payment}, cada cuota debería ser ${expected_installment:.2f}'
+                        'installment_amount': f'Con el pago inicial de ${initial_payment}, el total de cuotas (${total_installments_check}) debe aproximarse al saldo restante (${remaining_after_initial}). Sugerido: ${expected_installment:.2f} por cuota'
                     })
             
             # Si hay cuotas pero no monto especificado, calcularlo con el saldo restante
