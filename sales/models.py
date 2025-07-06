@@ -35,6 +35,7 @@ class Sale(models.Model):
     SALE_TYPE_CHOICES = [
         ('normal', 'Normal'),
         ('mayorista', 'Mayorista'),
+        ('credit', 'Crédito'),
     ]
 
     customer = models.ForeignKey(
