@@ -1,4 +1,5 @@
-from rest_framework import serializers
+from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
 from .models import Customer, Sale, SaleItem, Return, ReturnItem
 from catalogs.models import Product, ProductBatch, ProductComponent
 from catalogs.serializers import ProductSerializer, ProductSummarySerializer, ProductBatchSerializer
@@ -69,6 +70,11 @@ class SaleSerializer(serializers.ModelSerializer):
     """Serializador para las ventas con soporte para items anidados y productos compuestos."""
     
     items = SaleItemSerializer(many=True)
+    confirm_breakdown = serializers.BooleanField(
+        default=False,
+        write_only=True,
+        help_text="Si se envía en true, el sistema procederá a desarmar cajas/kits automáticamente según el plan sugerido."
+    )
     customer_details = CustomerSerializer(source='customer', read_only=True)
     location_details = LocationSerializer(source='location', read_only=True)
 
@@ -76,7 +82,7 @@ class SaleSerializer(serializers.ModelSerializer):
         model = Sale
         fields = [
             'id', 'customer', 'customer_details', 'location', 'location_details',
-            'sale_date', 'sale_type', 'should_invoice', 'total_gross', 'total_net', 'items'
+            'sale_date', 'sale_type', 'should_invoice', 'total_gross', 'total_net', 'items', 'confirm_breakdown'
         ]
         read_only_fields = ['sale_date', 'total_gross', 'total_net']
 
@@ -88,6 +94,10 @@ class SaleSerializer(serializers.ModelSerializer):
         Maneja productos compuestos/kits y sus componentes inteligentemente.
         """
         items_data = validated_data.pop('items')
+        # Señal de confirmación para desarmar composiciones
+        confirm_breakdown = validated_data.pop('confirm_breakdown', False)
+        # Almacenar en la instancia para que los métodos internos puedan consultarlo
+        self._confirm_breakdown = confirm_breakdown
         sale = Sale.objects.create(**validated_data)
         sale_location = sale.location
 
@@ -177,23 +187,44 @@ class SaleSerializer(serializers.ModelSerializer):
         Procesa la venta de un componente individual.
         Verifica stock directo primero, luego puede usar kits automáticamente.
         """
-        # Verificar stock directo del componente
+        # 1. Consumir stock directo disponible del componente
         available_component_stock = self._get_available_stock(product, batch, location)
-        
+
         if available_component_stock >= quantity:
-            # Hay suficiente stock directo del componente
+            # Hay suficiente stock directo; simple salida
             self._create_sale_movement(product, batch, quantity, sale, location, 'Componente individual')
-        else:
-            # No hay suficiente stock directo, necesitamos desarmar kits
-            if available_component_stock > 0:
-                # Usar el stock directo disponible primero
-                self._create_sale_movement(product, batch, available_component_stock, sale, location, 'Componente individual')
-            
-            # Calcular cantidad restante que necesitamos de kits
-            remaining_quantity = quantity - available_component_stock
-            
-            # Desarmar kits para obtener los componentes restantes
-            self._breakdown_kits_for_components(product, batch, remaining_quantity, sale, location)
+            return
+
+        # Consumir stock directo parcial si lo hay
+        sold_from_direct = 0
+        if available_component_stock > 0:
+            self._create_sale_movement(product, batch, available_component_stock, sale, location, 'Componente individual')
+            sold_from_direct = available_component_stock
+
+        remaining_quantity = quantity - sold_from_direct
+
+        # 2. Elaborar un plan de ruptura priorizando cajas homogéneas
+        breakdown_plan = self._plan_breakdown(product, remaining_quantity, location)
+
+        # Si el usuario no confirmó, devolver plan con 409
+        if not getattr(self, '_confirm_breakdown', False):
+            raise BreakdownConfirmationRequired(detail={
+                'breakdown_plan': breakdown_plan,
+                'message': 'Se requiere confirmación para desarmar las composiciones indicadas.'
+            })
+
+        # 3. Ejecutar el plan
+        obtained_from_breakdown = self._execute_breakdown_plan(breakdown_plan, sale, location)
+
+        # 4. Registrar la salida de los componentes necesarios (puede ser <= obtenidos)
+        self._create_sale_movement(
+            product,
+            batch,
+            remaining_quantity,
+            sale,
+            location,
+            'Componente obtenido de desarmado automático'
+        )
 
     def _process_simple_sale(self, product, batch, quantity, sale, location):
         """Procesa la venta de un producto simple."""
@@ -368,6 +399,151 @@ class SaleSerializer(serializers.ModelSerializer):
         except serializers.ValidationError:
             raise
 
+    # ------------------------------------------------------------------
+    # NUEVA LÓGICA DE DESARME PRIORIZADA
+    # ------------------------------------------------------------------
+
+    def _plan_breakdown(self, component_product, needed_quantity, location):
+        """Devuelve un plan de ruptura (lista de acciones) para obtener la cantidad necesaria.
+
+        La prioridad es:
+            1. Cajas homogéneas (boxed_component) ordenadas por menor tamaño (menos sobrante).
+            2. Kits mixtos (mixed_kit) ordenados por mayor cantidad del componente por kit.
+        Cada acción es un dict:
+            {
+                'kit_id': <Producto a romper>,
+                'kit_name': str,
+                'units_to_break': int,
+                'components_per_unit': int,
+                'components_obtained': int
+            }
+        """
+        actions = []
+        remaining = needed_quantity
+
+        # Paso 1: cajas homogéneas
+        box_relations = ProductComponent.objects.filter(
+            component_product=component_product,
+            composite_product__product_type='boxed_component'
+        )
+
+        # Map kit -> components_per_unit
+        box_infos = []
+        for rel in box_relations:
+            kit_product = rel.composite_product
+            available_kits = self._get_available_stock(kit_product, None, location)
+            if available_kits > 0:
+                box_infos.append({
+                    'kit': kit_product,
+                    'components_per_unit': rel.quantity,
+                    'available_kits': available_kits
+                })
+
+        # Ordenar por tamaño ascendente para minimizar excedentes
+        box_infos.sort(key=lambda x: x['components_per_unit'])
+
+        for info in box_infos:
+            if remaining <= 0:
+                break
+
+            components_per_unit = info['components_per_unit']
+            kits_needed = (remaining + components_per_unit - 1) // components_per_unit
+            kits_to_break = min(kits_needed, info['available_kits'])
+
+            if kits_to_break <= 0:
+                continue
+
+            components_obtained = kits_to_break * components_per_unit
+            actions.append({
+                'kit': info['kit'],
+                'units_to_break': kits_to_break,
+                'components_per_unit': components_per_unit,
+                'components_obtained': components_obtained
+            })
+
+            remaining -= components_obtained
+
+        # Paso 2: kits mixtos si aún falta
+        if remaining > 0:
+            kit_relations = ProductComponent.objects.filter(
+                component_product=component_product,
+                composite_product__product_type='mixed_kit'
+            )
+
+            kit_infos = []
+            for rel in kit_relations:
+                kit_product = rel.composite_product
+                available_kits = self._get_available_stock(kit_product, None, location)
+                if available_kits > 0:
+                    kit_infos.append({
+                        'kit': kit_product,
+                        'components_per_unit': rel.quantity,
+                        'available_kits': available_kits
+                    })
+
+            # Ordenar por eficiencia (más componentes por kit primero)
+            kit_infos.sort(key=lambda x: x['components_per_unit'], reverse=True)
+
+            for info in kit_infos:
+                if remaining <= 0:
+                    break
+
+                components_per_unit = info['components_per_unit']
+                kits_needed = (remaining + components_per_unit - 1) // components_per_unit
+                kits_to_break = min(kits_needed, info['available_kits'])
+
+                if kits_to_break <= 0:
+                    continue
+
+                components_obtained = kits_to_break * components_per_unit
+                actions.append({
+                    'kit': info['kit'],
+                    'units_to_break': kits_to_break,
+                    'components_per_unit': components_per_unit,
+                    'components_obtained': components_obtained
+                })
+
+                remaining -= components_obtained
+
+        # Validar que el plan cubra la necesidad
+        total_obtained = sum(a['components_obtained'] for a in actions)
+        if total_obtained < needed_quantity:
+            raise serializers.ValidationError(
+                f'No hay suficiente stock (cajas/kits) para obtener {needed_quantity} unidades de {component_product.name}. '
+                f'Solo se pueden obtener {total_obtained} unidades.'
+            )
+
+        # Serializar plan a un formato amigable para la API (sin objetos Django para evitar problemas de JSON)
+        serialized_actions = [
+            {
+                'kit_id': a['kit'].id,
+                'kit_name': a['kit'].name,
+                'units_to_break': a['units_to_break'],
+                'components_per_unit': a['components_per_unit'],
+                'components_obtained': a['components_obtained']
+            }
+            for a in actions
+        ]
+
+        return serialized_actions
+
+    def _execute_breakdown_plan(self, plan, sale, location):
+        """Ejecuta las acciones de ruptura y retorna la cantidad total obtenida."""
+        total_obtained = 0
+        for action in plan:
+            kit_product = Product.objects.get(pk=action['kit_id'])
+            units_to_break = action['units_to_break']
+
+            InventoryMovement.create_composite_breakdown(
+                composite_product=kit_product,
+                location=location,
+                quantity=units_to_break,
+                notes=f'Desarmado automático por venta #{sale.id}'
+            )
+
+            total_obtained += action['components_obtained']
+        return total_obtained
+
 
 class ReturnItemSerializer(serializers.ModelSerializer):
     """Serializador para los items de devolución."""
@@ -535,4 +711,15 @@ class ReturnSummarySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'original_sale_id', 'customer_name', 'location_name', 
             'return_date', 'reason', 'reason_display', 'total_amount'
-        ] 
+        ]
+
+
+# --- Excepciones personalizadas ---
+
+
+class BreakdownConfirmationRequired(APIException):
+    """Se lanza cuando se requiere confirmación explícita para desarmar cajas/kits."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_code = 'breakdown_confirmation_required'
+    default_detail = 'Se requiere confirmación para desarmar composiciones de inventario.' 
