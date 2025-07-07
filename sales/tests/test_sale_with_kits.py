@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from sales.models import Sale, SaleItem, Customer
-from sales.serializers import SaleSerializer, SaleItemSerializer
+from sales.serializers import SaleSerializer, SaleItemSerializer, BreakdownConfirmationRequired
 from catalogs.models import Product, ProductBatch, Category, ProductComponent
 from inventory.models import Location, InventoryStock, InventoryMovement
 
@@ -44,7 +44,7 @@ def kit_test_setup():
         description="Caja conteniendo 10 blisters de ibuprofeno",
         unit="caja",
         category=category,
-        product_type='composite',
+        product_type='boxed_component',
         requires_batch_control=False
     )
     
@@ -133,6 +133,7 @@ class TestCompositeProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -156,7 +157,7 @@ class TestCompositeProductSales:
         composite_movements = InventoryMovement.objects.filter(
             product=kit_test_setup['composite_product'],
             movement_type='out',
-            notes__contains=f'Venta #{sale.id}'
+            notes__contains=f'Venta #{sale.id} - Producto compuesto'
         )
         assert composite_movements.count() == 1
         composite_movement = composite_movements.first()
@@ -185,6 +186,7 @@ class TestCompositeProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -210,6 +212,7 @@ class TestComponentProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -234,7 +237,7 @@ class TestComponentProductSales:
         movements = InventoryMovement.objects.filter(
             product=kit_test_setup['component_product'],
             movement_type='out',
-            notes__contains=f'Venta #{sale.id} - Componente individual'
+            notes__contains='Componente individual'
         )
         assert movements.count() == 1
         assert movements.first().quantity == 3
@@ -248,7 +251,9 @@ class TestComponentProductSales:
         assert component_stock.quantity == 2  # 5 - 3 = 2
 
     def test_sell_component_auto_breakdown_kits(self, kit_test_setup):
-        """Test vender componente usando desarmado automático de kits."""
+        """Test flujo de confirmación al desarmar kits para vender componentes."""
+
+        # 1. Intento sin confirm_breakdown → debe lanzar excepción 409
         sale_data = {
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
@@ -256,22 +261,35 @@ class TestComponentProductSales:
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
-                    'quantity': 15,  # Vender 15 blisters (5 directos + 10 de 1 caja)
+                    'quantity': 15,  # 5 directos + 10 provenientes de una caja
                     'unit_price': '5000.00'
                 }
             ]
         }
-        
+
+        serializer = SaleSerializer(data=sale_data)
+        assert serializer.is_valid(), serializer.errors
+
+        with pytest.raises(BreakdownConfirmationRequired) as exc:
+            serializer.save()
+
+        plan = exc.value.detail['breakdown_plan']
+        # Debe proponer al menos una acción (romper 1 caja)
+        assert len(plan) >= 1
+        assert any(str(action['kit_id']) == str(kit_test_setup['composite_product'].id) for action in plan)
+
+        # 2. Misma venta con confirm_breakdown = True
+        sale_data['confirm_breakdown'] = True
         serializer = SaleSerializer(data=sale_data)
         assert serializer.is_valid(), serializer.errors
         sale = serializer.save()
-        
-        # Verificar que la venta se creó correctamente
+
+        # Venta creada correctamente
         assert sale.items.count() == 1
         item = sale.items.first()
         assert item.quantity == 15
-        
-        # Verificar que se usó stock directo primero
+
+        # Stock directo primero
         direct_movements = InventoryMovement.objects.filter(
             product=kit_test_setup['component_product'],
             movement_type='out',
@@ -279,39 +297,38 @@ class TestComponentProductSales:
         )
         assert direct_movements.count() == 1
         assert direct_movements.first().quantity == 5
-        
-        # Verificar que se desarmó una caja
+
+        # Desarmó la caja
         breakdown_movements = InventoryMovement.objects.filter(
             product=kit_test_setup['composite_product'],
             movement_type='out',
             notes__contains='Desarmado automático'
         )
         assert breakdown_movements.count() == 1
-        assert breakdown_movements.first().quantity == 1  # 1 caja desarmada
-        
-        # Verificar que se vendieron componentes del desarmado
+        assert breakdown_movements.first().quantity == 1
+
+        # Venta de componentes provenientes del desarmado
         kit_sale_movements = InventoryMovement.objects.filter(
             product=kit_test_setup['component_product'],
             movement_type='out',
-            notes__contains='De desarmado'
+            notes__contains='obtenido de desarmado'
         )
         assert kit_sale_movements.count() == 1
-        assert kit_sale_movements.first().quantity == 10  # 10 blisters de la caja
-        
+        assert kit_sale_movements.first().quantity == 10
+
         # Verificar stock final
         composite_stock = InventoryStock.objects.get(
             product=kit_test_setup['composite_product'],
             location=kit_test_setup['location']
         )
-        assert composite_stock.quantity == 2  # 3 - 1 = 2 cajas
-        
-        # El stock directo de componentes debe estar agotado
+        assert composite_stock.quantity == 2  # 3 - 1
+
         component_stock = InventoryStock.objects.get(
             product=kit_test_setup['component_product'],
             location=kit_test_setup['location'],
             batch__isnull=True
         )
-        assert component_stock.quantity == 0  # 5 - 5 = 0
+        assert component_stock.quantity == 0  # 5 - 5
 
     def test_sell_component_multiple_kit_breakdown(self, kit_test_setup):
         """Test vender componente que requiere desarmar múltiples kits."""
@@ -319,6 +336,7 @@ class TestComponentProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -354,6 +372,7 @@ class TestComponentProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -379,6 +398,7 @@ class TestMixedProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 # Producto simple
                 {
@@ -439,7 +459,7 @@ class TestMixedProductSales:
             description="Kit médico básico",
             unit="kit",
             category=kit_test_setup['category'],
-            product_type='composite',
+            product_type='mixed_kit',
             requires_batch_control=False
         )
         
@@ -463,6 +483,7 @@ class TestMixedProductSales:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -523,6 +544,7 @@ class TestStockValidationWithKits:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -548,6 +570,7 @@ class TestStockValidationWithKits:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -587,6 +610,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -611,7 +635,7 @@ class TestCompositeProductStockIntegration:
         composite_movement = InventoryMovement.objects.filter(
             product=kit_test_setup['composite_product'],
             movement_type='out',
-            notes__contains=f'Venta #{sale.id}'
+            notes__contains=f'Venta #{sale.id} - Producto compuesto'
         ).first()
         
         component_movements = InventoryMovement.objects.filter(
@@ -682,6 +706,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -757,6 +782,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -836,6 +862,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -863,6 +890,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['component_product'].id,
@@ -887,7 +915,7 @@ class TestCompositeProductStockIntegration:
             description="Kit premium sin control de lotes",
             unit="kit",
             category=kit_test_setup['category'],
-            product_type='composite',
+            product_type='boxed_component',
             requires_batch_control=False  # Los kits generalmente no requieren lotes
         )
         
@@ -929,6 +957,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': composite_simple.id,
@@ -990,6 +1019,7 @@ class TestCompositeProductStockIntegration:
             'customer': kit_test_setup['customer'].id,
             'location': kit_test_setup['location'].id,
             'sale_type': 'normal',
+            'confirm_breakdown': True,
             'items': [
                 {
                     'product': kit_test_setup['composite_product'].id,
@@ -1011,7 +1041,7 @@ class TestCompositeProductStockIntegration:
         composite_out_movements = InventoryMovement.objects.filter(
             product=kit_test_setup['composite_product'],
             movement_type='out',
-            notes__contains=f'Venta #{sale.id}'
+            notes__contains=f'Venta #{sale.id} - Producto compuesto'
         )
         assert composite_out_movements.count() == 1
         

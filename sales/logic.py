@@ -17,44 +17,27 @@ def _update_inventory_for_return(return_item, factor):
     notes_action = "Devolución" if factor == 1 else "Reversión de devolución"
 
     # Caso 1: El producto devuelto es una 'caja' (composite)
-    if product.product_type == 'composite':
-        # 1. Crear movimiento para el producto compuesto (caja)
-        # Los productos compuestos generalmente no requieren control de lotes
-        composite_batch = batch if product.requires_batch_control else None
-        InventoryMovement.objects.create(
-            product=product,
-            location=location,
-            batch=composite_batch,
-            movement_type=movement_type,
-            quantity=abs(quantity),
-            notes=f'{notes_action} de producto compuesto (Devolución #{return_item.return_obj.id})'
-        )
-        
-        # 2. Aumentar el stock de sus componentes
+    if product.product_type in ['boxed_component', 'mixed_kit', 'composite']:
+        # No modificar stock de la caja; solo ajustar componentes asociados
         for component_link in product.composite_components.all():
             component = component_link.component_product
-            component_quantity = component_link.quantity * quantity
-            
-            # Para productos compuestos, devolvemos los componentes al lote más próximo a vencer
-            # usando la misma lógica FIFO que se usó en la venta
+            component_quantity = component_link.quantity * quantity  # quantity ya incluye factor ±
+
             component_batch = None
             if component.requires_batch_control:
-                # Buscar el lote más próximo a vencer con stock (para devolver)
-                from inventory.models import InventoryStock
                 stock_entry = InventoryStock.objects.filter(
                     product=component,
                     location=location,
                     batch__isnull=False
                 ).order_by('batch__expiry_date').first()
-                
                 if stock_entry:
                     component_batch = stock_entry.batch
-            
+
             InventoryMovement.objects.create(
                 product=component,
                 location=location,
                 batch=component_batch,
-                movement_type=movement_type,
+                movement_type=movement_type,  # in/out según devolución o reversión
                 quantity=abs(component_quantity),
                 notes=f'{notes_action} de componente via caja {product.name} (Devolución #{return_item.return_obj.id})'
             )
@@ -101,8 +84,8 @@ def _check_and_restock_composites(component, location):
     """
     Verifica si la devolución de un componente permite re-completar el stock de un producto compuesto (caja).
     """
-    # Encontrar todas las 'cajas' que contienen este 'componente'
-    composite_links = ProductComponent.objects.filter(component_product=component)
+    # Encontrar todas las cajas/kits que contienen este 'componente'
+    composite_links = ProductComponent.objects.filter(component_product=component, composite_product__product_type__in=['boxed_component','mixed_kit','composite'])
     
     for link in composite_links:
         composite = link.composite_product
