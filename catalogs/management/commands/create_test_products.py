@@ -5,6 +5,7 @@ from catalogs.models import Category, Product, ProductBatch, ProductComponent
 from inventory.models import Location, InventoryStock, InventoryMovement
 import random
 from decimal import Decimal
+from django.db import models
 
 
 class Command(BaseCommand):
@@ -14,13 +15,18 @@ class Command(BaseCommand):
         parser.add_argument(
             '--clean',
             action='store_true',
-            help='Elimina los productos de prueba existentes antes de crear nuevos',
+            help='(LEGACY) Alias de --reset. Elimina productos de prueba existentes antes de crear nuevos',
+        )
+        parser.add_argument(
+            '--reset',
+            action='store_true',
+            help='Elimina productos de prueba existentes antes de crear nuevos',
         )
 
     def handle(self, *args, **options):
         try:
             with transaction.atomic():
-                if options['clean']:
+                if options.get('clean') or options.get('reset'):
                     self.clean_test_data()
                 
                 self.create_test_data()
@@ -34,31 +40,56 @@ class Command(BaseCommand):
         """Elimina productos de prueba existentes."""
         self.stdout.write('Eliminando productos de prueba existentes...')
         
-        # Eliminar stock de productos de prueba
-        test_products = Product.objects.filter(sku__startswith='TEST-')
-        stock_count = InventoryStock.objects.filter(product__in=test_products).count()
-        InventoryStock.objects.filter(product__in=test_products).delete()
-        
-        # Eliminar movimientos de productos de prueba
-        movement_count = InventoryMovement.objects.filter(product__in=test_products).count()
-        InventoryMovement.objects.filter(product__in=test_products).delete()
-        
-        # Eliminar productos que empiecen con TEST-
-        product_count = test_products.count()
-        test_products.delete()
+        test_products = Product.objects.filter(
+            models.Q(sku__startswith='TEST-') | models.Q(category__name__startswith='Test ')
+        )
+
+        # 1. Dependientes directos de inventario
+        stock_count = InventoryStock.objects.filter(product__in=test_products).delete()[0]
+        movement_count = InventoryMovement.objects.filter(product__in=test_products).delete()[0]
+
+        # 2. SaleItem y ventas relacionadas
+        from sales.models import SaleItem, Sale, ReturnItem, Return
+        sale_items_qs = SaleItem.objects.filter(product__in=test_products)
+        sale_ids = list(sale_items_qs.values_list('sale_id', flat=True))
+        sale_item_count = sale_items_qs.delete()[0]
+
+        # 3. ReturnItems y devoluciones relacionadas
+        return_items_qs = ReturnItem.objects.filter(product__in=test_products)
+        return_ids = list(return_items_qs.values_list('return_obj_id', flat=True))
+        return_item_count = return_items_qs.delete()[0]
+
+        # Eliminar devoluciones sin items
+        Return.objects.filter(id__in=return_ids, items__isnull=True).delete()
+
+        # Eliminar ventas sin items
+        Sale.objects.filter(id__in=sale_ids, items__isnull=True).delete()
+
+        # 4. Batches y componentes
+        batch_count = ProductBatch.objects.filter(product__in=test_products).delete()[0]
+        component_link_count = ProductComponent.objects.filter(
+            models.Q(composite_product__in=test_products) | models.Q(component_product__in=test_products)
+        ).delete()[0]
+
+        # 5. Finalmente, productos
+        product_count = test_products.delete()[0]
         
         # Eliminar categorías de prueba
         category_count = Category.objects.filter(name__startswith='Test ').count()
         Category.objects.filter(name__startswith='Test ').delete()
         
-        # Eliminar ubicaciones de prueba
-        location_count = Location.objects.filter(name__startswith='Test ').count()
-        Location.objects.filter(name__startswith='Test ').delete()
+        # Eliminar ubicaciones de prueba sin ventas ni devoluciones vinculadas
+        test_locations = Location.objects.filter(name__startswith='Test ')
+        used_locations = test_locations.filter(models.Q(sales__isnull=False) | models.Q(returns__isnull=False)).distinct()
+        safe_locations = test_locations.exclude(id__in=used_locations.values_list('id', flat=True))
+        location_count = safe_locations.count()
+        safe_locations.delete()
         
         self.stdout.write(
             f'Eliminados: {product_count} productos, {category_count} categorías, '
-            f'{location_count} ubicaciones, {stock_count} registros de stock, '
-            f'{movement_count} movimientos'
+            f'{location_count} ubicaciones, {stock_count} stock, {movement_count} movimientos, '
+            f'{sale_item_count} sale_items, {return_item_count} return_items, {batch_count} lotes, '
+            f'{component_link_count} enlaces de componentes'
         )
 
     def create_test_data(self):
@@ -316,10 +347,12 @@ class Command(BaseCommand):
         for comp_data in composite_data:
             components = comp_data.pop('components')
             
+            product_type = 'boxed_component' if len(components) == 1 else 'mixed_kit'
+
             composite_product = Product.objects.create(
                 category=kit_category,
-                product_type='composite',
-                requires_batch_control=False,  # Los compuestos generalmente no tienen lotes propios
+                product_type=product_type,
+                requires_batch_control=False,
                 sale_price=self._generate_sale_price(),
                 **comp_data
             )

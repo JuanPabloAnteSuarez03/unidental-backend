@@ -43,10 +43,15 @@ class Product(models.Model):
     """
     Producto ofrecido o gestionado por Unidental.
     """
+    # Nuevos tipos para soportar la diferenciación entre cajas homogéneas (boxed_component)
+    # y kits mixtos (mixed_kit). Se mantiene "composite" para compatibilidad con datos
+    # existentes, pero se recomienda migrar a los nuevos tipos.
     PRODUCT_TYPE_CHOICES = [
         ('simple', 'Producto Simple'),
-        ('composite', 'Producto Compuesto/Kit'),
-        ('component', 'Componente de Kit'),
+        ('boxed_component', 'Caja/Empaque de componente único'),
+        ('mixed_kit', 'Kit Mixto de varios productos'),
+        ('composite', 'Producto Compuesto/Kit (LEGACY)'),
+        ('component', 'Componente individual de Kit'),
     ]
     
     sku = models.CharField(
@@ -141,12 +146,16 @@ class Product(models.Model):
         ordering = ['name']
     
     def is_composite(self):
-        """Retorna True si este producto es un compuesto/kit."""
-        return self.product_type == 'composite'
-    
-    def is_component(self):
-        """Retorna True si este producto es componente de un kit."""
-        return self.product_type == 'component'
+        """Retorna True si este producto es un producto compuesto (caja o kit)."""
+        return self.product_type in ['boxed_component', 'mixed_kit', 'composite']
+
+    def is_boxed_component(self):
+        """True si el producto es una caja que contiene unidades homogéneas del mismo componente."""
+        return self.product_type == 'boxed_component'
+
+    def is_mixed_kit(self):
+        """True si el producto es un kit mixto con distintos componentes."""
+        return self.product_type == 'mixed_kit'
     
     def get_components(self):
         """Retorna los componentes de este producto si es un compuesto."""
@@ -159,6 +168,10 @@ class Product(models.Model):
         if self.is_component():
             return self.component_of.all()
         return ProductComponent.objects.none()
+
+    def is_component(self):
+        """True si el producto es un componente individual que puede formar parte de un kit."""
+        return self.product_type == 'component'
 
 
 class ProductComponent(models.Model):
@@ -202,10 +215,10 @@ class ProductComponent(models.Model):
         if self.composite_product == self.component_product:
             raise ValidationError("Un producto no puede ser componente de sí mismo.")
         
-        if self.composite_product.product_type != 'composite':
-            raise ValidationError("El producto padre debe ser de tipo 'Compuesto/Kit'.")
+        if not self.composite_product.is_composite():
+            raise ValidationError("El producto padre debe ser de tipo compuesto (boxed_component o mixed_kit).")
         
-        if self.component_product.product_type == 'composite':
+        if self.component_product.is_composite():
             raise ValidationError("Un producto compuesto no puede ser componente de otro (no se admiten kits anidados).")
 
 
