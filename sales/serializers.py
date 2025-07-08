@@ -412,19 +412,80 @@ class SaleSerializer(serializers.ModelSerializer):
 
     def _plan_breakdown(self, component_product, needed_quantity, location):
         """Devuelve un plan de ruptura (lista de acciones) para obtener la cantidad necesaria.
+        
+        Soporta desarmado en cadena: si no hay kits directos disponibles que contengan 
+        el componente, busca recursivamente kits que contengan productos intermedios 
+        que a su vez contengan el componente deseado.
 
         La prioridad es:
             1. Cajas homogéneas (boxed_component) ordenadas por menor tamaño (menos sobrante).
             2. Kits mixtos (mixed_kit) ordenados por mayor cantidad del componente por kit.
+            3. Desarmado en cadena recursivo para productos intermedios.
+        
         Cada acción es un dict:
             {
                 'kit_id': <Producto a romper>,
                 'kit_name': str,
                 'units_to_break': int,
                 'components_per_unit': int,
-                'components_obtained': int
+                'components_obtained': int,
+                'breakdown_chain': [lista de productos en la cadena de desarmado]
             }
         """
+        return self._plan_breakdown_recursive(component_product, needed_quantity, location, [])
+
+    def _plan_breakdown_recursive(self, component_product, needed_quantity, location, breakdown_chain):
+        """Implementación recursiva del plan de desarmado con detección de ciclos."""
+        # Detectar ciclos en la cadena de desarmado
+        if component_product in breakdown_chain:
+            return []  # Evitar ciclos infinitos
+        
+        actions = []
+        remaining = needed_quantity
+        current_chain = breakdown_chain + [component_product]
+
+        # Paso 1: buscar kits directos que contengan este componente
+        direct_actions = self._find_direct_breakdown_actions(component_product, remaining, location, current_chain)
+        
+        for action in direct_actions:
+            if remaining <= 0:
+                break
+            
+            components_obtained = action['components_obtained']
+            actions.append(action)
+            remaining -= components_obtained
+
+        # Paso 2: si aún falta stock, intentar desarmado en cadena
+        if remaining > 0:
+            chain_actions = self._find_chain_breakdown_actions(component_product, remaining, location, current_chain)
+            actions.extend(chain_actions)
+            remaining -= sum(action['components_obtained'] for action in chain_actions)
+
+        # Validar que el plan cubra la necesidad
+        total_obtained = sum(a['components_obtained'] for a in actions)
+        if total_obtained < needed_quantity:
+            raise serializers.ValidationError(
+                f'No hay suficiente stock (cajas/kits) para obtener {needed_quantity} unidades de {component_product.name}. '
+                f'Solo se pueden obtener {total_obtained} unidades.'
+            )
+
+        # Serializar plan a un formato amigable para la API
+        serialized_actions = [
+            {
+                'kit_id': a['kit'].id,
+                'kit_name': a['kit'].name,
+                'units_to_break': a['units_to_break'],
+                'components_per_unit': a['components_per_unit'],
+                'components_obtained': a['components_obtained'],
+                'breakdown_chain': [p.name for p in a.get('breakdown_chain', [])]
+            }
+            for a in actions
+        ]
+
+        return serialized_actions
+
+    def _find_direct_breakdown_actions(self, component_product, needed_quantity, location, breakdown_chain):
+        """Encuentra acciones de desarmado directo (kits que contienen directamente el componente)."""
         actions = []
         remaining = needed_quantity
 
@@ -434,7 +495,6 @@ class SaleSerializer(serializers.ModelSerializer):
             composite_product__product_type='boxed_component'
         )
 
-        # Map kit -> components_per_unit
         box_infos = []
         for rel in box_relations:
             kit_product = rel.composite_product
@@ -465,7 +525,8 @@ class SaleSerializer(serializers.ModelSerializer):
                 'kit': info['kit'],
                 'units_to_break': kits_to_break,
                 'components_per_unit': components_per_unit,
-                'components_obtained': components_obtained
+                'components_obtained': components_obtained,
+                'breakdown_chain': breakdown_chain.copy()
             })
 
             remaining -= components_obtained
@@ -507,46 +568,106 @@ class SaleSerializer(serializers.ModelSerializer):
                     'kit': info['kit'],
                     'units_to_break': kits_to_break,
                     'components_per_unit': components_per_unit,
-                    'components_obtained': components_obtained
+                    'components_obtained': components_obtained,
+                    'breakdown_chain': breakdown_chain.copy()
                 })
 
                 remaining -= components_obtained
 
-        # Validar que el plan cubra la necesidad
-        total_obtained = sum(a['components_obtained'] for a in actions)
-        if total_obtained < needed_quantity:
-            raise serializers.ValidationError(
-                f'No hay suficiente stock (cajas/kits) para obtener {needed_quantity} unidades de {component_product.name}. '
-                f'Solo se pueden obtener {total_obtained} unidades.'
-            )
+        return actions
 
-        # Serializar plan a un formato amigable para la API (sin objetos Django para evitar problemas de JSON)
-        serialized_actions = [
-            {
-                'kit_id': a['kit'].id,
-                'kit_name': a['kit'].name,
-                'units_to_break': a['units_to_break'],
-                'components_per_unit': a['components_per_unit'],
-                'components_obtained': a['components_obtained']
-            }
-            for a in actions
-        ]
+    def _find_chain_breakdown_actions(self, component_product, needed_quantity, location, breakdown_chain):
+        """Encuentra acciones de desarmado en cadena (productos intermedios que contengan el componente)."""
+        actions = []
+        remaining = needed_quantity
 
-        return serialized_actions
+        # Buscar productos intermedios que contengan el componente deseado
+        intermediate_relations = ProductComponent.objects.filter(component_product=component_product)
+        
+        for relation in intermediate_relations:
+            if remaining <= 0:
+                break
+                
+            intermediate_product = relation.composite_product
+            
+            # Verificar si este producto intermedio es componente de otros kits
+            parent_relations = ProductComponent.objects.filter(component_product=intermediate_product)
+            
+            for parent_relation in parent_relations:
+                if remaining <= 0:
+                    break
+                    
+                parent_kit = parent_relation.composite_product
+                available_parent_kits = self._get_available_stock(parent_kit, None, location)
+                
+                if available_parent_kits <= 0:
+                    continue
+                
+                # Calcular cuántos componentes finales podemos obtener del kit padre
+                intermediates_per_parent = parent_relation.quantity
+                components_per_intermediate = relation.quantity
+                components_per_parent_kit = intermediates_per_parent * components_per_intermediate
+                
+                if components_per_parent_kit <= 0:
+                    continue
+                
+                # Calcular cuántos kits padre necesitamos
+                parent_kits_needed = (remaining + components_per_parent_kit - 1) // components_per_parent_kit
+                parent_kits_to_break = min(parent_kits_needed, available_parent_kits)
+                
+                if parent_kits_to_break <= 0:
+                    continue
+                
+                # Calcular componentes finales obtenidos
+                intermediates_obtained = parent_kits_to_break * intermediates_per_parent
+                components_obtained = min(intermediates_obtained * components_per_intermediate, remaining)
+                
+                # Crear acción de desarmado en cadena
+                actions.append({
+                    'kit': parent_kit,
+                    'units_to_break': parent_kits_to_break,
+                    'components_per_unit': components_per_parent_kit,
+                    'components_obtained': components_obtained,
+                    'breakdown_chain': breakdown_chain.copy(),
+                    'intermediate_product': intermediate_product,
+                    'intermediate_quantity': intermediates_obtained
+                })
+                
+                remaining -= components_obtained
+
+        return actions
 
     def _execute_breakdown_plan(self, plan, sale, location):
-        """Ejecuta las acciones de ruptura y retorna la cantidad total obtenida."""
+        """Ejecuta las acciones de ruptura y retorna la cantidad total obtenida.
+        
+        Maneja tanto desarmado directo como desarmado en cadena.
+        Para el desarmado en cadena, ejecuta múltiples niveles de desarmado automáticamente.
+        """
         total_obtained = 0
         for action in plan:
             kit_product = Product.objects.get(pk=action['kit_id'])
             units_to_break = action['units_to_break']
 
+            # Ejecutar desarmado del kit principal
             InventoryMovement.create_composite_breakdown(
                 composite_product=kit_product,
                 location=location,
                 quantity=units_to_break,
                 notes=f'Desarmado automático por venta #{sale.id}'
             )
+
+            # Si es un desarmado en cadena, ejecutar desarmados adicionales
+            if 'intermediate_product' in action:
+                intermediate_product = Product.objects.get(pk=action['intermediate_product'].id)
+                intermediate_quantity = action['intermediate_quantity']
+                
+                # Desarmar los productos intermedios obtenidos
+                InventoryMovement.create_composite_breakdown(
+                    composite_product=intermediate_product,
+                    location=location,
+                    quantity=intermediate_quantity,
+                    notes=f'Desarmado en cadena automático por venta #{sale.id} - Nivel 2'
+                )
 
             total_obtained += action['components_obtained']
         return total_obtained
