@@ -383,7 +383,14 @@ class SaleSerializer(serializers.ModelSerializer):
             raise
     
     def _validate_component_stock(self, product, batch, quantity, location):
-        """Valida que hay suficiente stock total del componente."""
+        """Valida que hay suficiente stock del componente."""
+        # Si se especifica un lote específico, validar solo ese lote
+        if batch and product.requires_batch_control:
+            self._check_and_reserve_stock(product, batch, quantity, location)
+            return
+        
+        # Si no se especifica lote o no requiere control de lotes, 
+        # validar stock total disponible (directo + de kits)
         total_available = self._calculate_total_available_components(product, location)
         
         if total_available < quantity:
