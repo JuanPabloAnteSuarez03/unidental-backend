@@ -164,6 +164,24 @@ class InventoryMovement(models.Model):
         verbose_name="Transferencia Interna",
         help_text="Marcar si este movimiento es una transferencia entre bodegas/sedes."
     )
+    destination_location = models.ForeignKey(
+        Location,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='incoming_transfers',
+        verbose_name="Ubicación de Destino",
+        help_text="Ubicación de destino para transferencias internas."
+    )
+    related_transfer_movement = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='incoming_transfer_movement',
+        verbose_name="Movimiento de Transferencia Relacionado",
+        help_text="Vincula el movimiento de entrada con el de salida en una transferencia."
+    )
     occurred_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de ocurrencia")
     user = models.ForeignKey(
         User, 
@@ -181,6 +199,7 @@ class InventoryMovement(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+        related_name='component_movements',
         verbose_name="Movimiento de Producto Compuesto Relacionado",
         help_text="Movimiento del producto padre que generó este movimiento"
     )
@@ -216,25 +235,13 @@ class InventoryMovement(models.Model):
         if self.product.requires_batch_control and not self.batch:
             raise ValidationError({'batch': 'Este producto requiere especificar un lote.'})
         
-        # Validar que no se genere stock negativo en movimientos de salida
-        if self.movement_type == 'out':
-            if self.batch:
-                # Verificar stock del lote específico
-                current_stock = InventoryStock.objects.filter(
-                    product=self.product,
-                    location=self.location,
-                    batch=self.batch
-                ).first()
-                available_quantity = current_stock.quantity if current_stock else 0
-            else:
-                # Verificar stock total del producto
-                available_quantity = InventoryStock.get_total_stock(self.product, self.location)
-            
-            if available_quantity < self.quantity:
-                raise ValidationError({
-                    'quantity': f'Stock insuficiente. Disponible: {available_quantity}, solicitado: {self.quantity}'
-                })
-    
+        # Validar que si el producto no requiere control de lotes, no se especifique un lote
+        if not self.product.requires_batch_control and self.batch:
+            raise ValidationError({'batch': 'Este producto no requiere control de lotes.'})
+
+        if self.is_internal_transfer and self.movement_type == 'out' and not self.destination_location:
+            raise ValidationError({'destination_location': 'Se requiere una ubicación de destino para las transferencias de salida.'})
+
     def save(self, *args, **kwargs):
         """
         Actualiza el stock automáticamente basado en el estado del movimiento.
@@ -254,6 +261,23 @@ class InventoryMovement(models.Model):
         # Caso 1: Un movimiento se marca como 'completed'
         if self.status == 'completed' and old_status != 'completed':
             self._update_stock()
+
+            # Si es una transferencia, crear el movimiento de entrada correspondiente
+            if self.is_internal_transfer and self.destination_location and self.movement_type == 'out':
+                if not InventoryMovement.objects.filter(related_transfer_movement=self).exists():
+                    InventoryMovement.objects.create(
+                        product=self.product,
+                        location=self.destination_location,
+                        batch=self.batch,
+                        movement_type='in',
+                        quantity=self.quantity,
+                        status='completed',
+                        user=self.user,
+                        notes=f"Recepción de transferencia desde {self.location.name}. Ref mov: {self.pk}",
+                        is_internal_transfer=True,
+                        related_transfer_movement=self
+                    )
+
             # Manejar productos compuestos solo cuando el movimiento principal se completa
             if self.product.is_composite() and self.movement_type in ['in', 'out']:
                 self._handle_composite_movement()
@@ -261,6 +285,17 @@ class InventoryMovement(models.Model):
         # Caso 2: Un movimiento 'completed' se cambia (ej. a 'cancelled' o 'pending')
         elif self.status != 'completed' and old_status == 'completed':
             self._revert_stock_update()
+
+            # Si es una transferencia, revertir el movimiento de entrada correspondiente
+            if self.is_internal_transfer and self.movement_type == 'out':
+                try:
+                    incoming_movement = InventoryMovement.objects.get(related_transfer_movement=self)
+                    if incoming_movement.status == 'completed':
+                        incoming_movement.status = 'cancelled'
+                        incoming_movement.save() # Esto dispara la reversión de stock para la entrada
+                except InventoryMovement.DoesNotExist:
+                    pass # No hay movimiento de entrada para revertir
+
             # TODO: Revertir los movimientos de componentes si es un producto compuesto.
             # Por ahora, solo se revierte el stock del producto principal.
     

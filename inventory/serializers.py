@@ -111,18 +111,24 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
     
     # Campos para productos compuestos
     related_movement_id = serializers.IntegerField(source='related_composite_movement.id', read_only=True)
-    
+
+    # Campos para transferencias
+    destination_location_name = serializers.CharField(source='destination_location.name', read_only=True)
+    related_transfer_movement_id = serializers.IntegerField(source='related_transfer_movement.id', read_only=True)
+
     class Meta:
         model = InventoryMovement
         fields = [
             'id', 'product', 'product_name', 'product_sku',
             'location', 'location_name', 'location_type',
+            'destination_location', 'destination_location_name',
             'batch', 'batch_details', 'batch_number',
             'movement_type', 'movement_type_display', 'quantity', 'status', 'status_display',
             'is_internal_transfer', 'occurred_at', 'user', 'user_username', 'notes',
-            'related_composite_movement', 'related_movement_id'
+            'related_composite_movement', 'related_movement_id',
+            'related_transfer_movement', 'related_transfer_movement_id'
         ]
-        read_only_fields = ['id', 'occurred_at']
+        read_only_fields = ['id', 'occurred_at', 'related_transfer_movement']
 
     def validate_quantity(self, value):
         """Validar que la cantidad sea positiva."""
@@ -160,6 +166,16 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
                 'batch': 'El lote no corresponde al producto seleccionado.'
             })
         
+        # Validar destino en transferencias
+        is_internal_transfer = data.get('is_internal_transfer')
+        destination_location = data.get('destination_location')
+        movement_type = data.get('movement_type')
+
+        if is_internal_transfer and movement_type == 'out' and not destination_location:
+            raise serializers.ValidationError({
+                'destination_location': 'Se requiere una ubicación de destino para las transferencias de salida.'
+            })
+
         return data
     
     def create(self, validated_data):
