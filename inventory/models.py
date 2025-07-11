@@ -120,6 +120,12 @@ class InventoryMovement(models.Model):
         ('composite_conversion', 'Conversión de Producto Compuesto'),
         ('composite_assembly', 'Ensamblaje de Compuesto'),
     ]
+
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('completed', 'Completado'),
+        ('cancelled', 'Cancelado'),
+    ]
     
     product = models.ForeignKey(
         Product, 
@@ -147,6 +153,12 @@ class InventoryMovement(models.Model):
         verbose_name="Tipo de movimiento"
     )
     quantity = models.IntegerField(verbose_name="Cantidad")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='completed',
+        verbose_name="Estado"
+    )
     occurred_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de ocurrencia")
     user = models.ForeignKey(
         User, 
@@ -219,19 +231,50 @@ class InventoryMovement(models.Model):
                 })
     
     def save(self, *args, **kwargs):
-        """Actualizar el stock automáticamente cuando se crea un movimiento."""
-        # Ejecutar validaciones antes de guardar
+        """
+        Actualiza el stock automáticamente basado en el estado del movimiento.
+        - 'completed': aplica el movimiento al stock.
+        - 'pending'/'cancelled': no afecta el stock, o revierte si venía de 'completed'.
+        """
+        is_new = self._state.adding
+        old_status = None
+        if not is_new:
+            # Obtener el estado de la base de datos antes de que se guarde la instancia.
+            old_status = InventoryMovement.objects.get(pk=self.pk).status
+        
         self.full_clean()
         
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # Guardar primero para que self.status sea el nuevo estado
         
-        # Actualizar stock
-        self._update_stock()
-        
-        # Si es un producto compuesto, manejar los componentes
-        if self.product.is_composite() and self.movement_type in ['in', 'out']:
-            self._handle_composite_movement()
+        # Caso 1: Un movimiento se marca como 'completed'
+        if self.status == 'completed' and old_status != 'completed':
+            self._update_stock()
+            # Manejar productos compuestos solo cuando el movimiento principal se completa
+            if self.product.is_composite() and self.movement_type in ['in', 'out']:
+                self._handle_composite_movement()
+
+        # Caso 2: Un movimiento 'completed' se cambia (ej. a 'cancelled' o 'pending')
+        elif self.status != 'completed' and old_status == 'completed':
+            self._revert_stock_update()
+            # TODO: Revertir los movimientos de componentes si es un producto compuesto.
+            # Por ahora, solo se revierte el stock del producto principal.
     
+    def _revert_stock_update(self):
+        """Revierte la actualización de stock de este movimiento."""
+        stock, _ = InventoryStock.objects.get_or_create(
+            product=self.product,
+            location=self.location,
+            batch=self.batch,
+            defaults={'quantity': 0}
+        )
+        
+        if self.movement_type in ['in', 'composite_assembly']:
+            stock.quantity -= self.quantity
+        elif self.movement_type in ['out', 'composite_conversion']:
+            stock.quantity += self.quantity
+        
+        stock.save()
+
     def _update_stock(self):
         """Actualiza el stock según el movimiento."""
         # Obtener o crear el registro de stock
