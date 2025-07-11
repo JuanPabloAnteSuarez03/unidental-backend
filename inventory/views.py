@@ -573,6 +573,8 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
                 'location': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la ubicación"),
                 'movement_type': openapi.Schema(type=openapi.TYPE_STRING, enum=['in', 'out'], description="Tipo de movimiento"),
                 'quantity': openapi.Schema(type=openapi.TYPE_INTEGER, description="Cantidad (positiva)"),
+                'status': openapi.Schema(type=openapi.TYPE_STRING, enum=['pending', 'completed'], description="Estado inicial (opcional, por defecto 'completed')"),
+                'is_internal_transfer': openapi.Schema(type=openapi.TYPE_BOOLEAN, description="Marcar si es una transferencia interna (opcional)"),
                 'expiry_date': openapi.Schema(type=openapi.TYPE_STRING, format='date', description="Fecha de vencimiento (opcional)"),
                 'notes': openapi.Schema(type=openapi.TYPE_STRING, description="Notas adicionales (opcional)"),
             }

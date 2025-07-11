@@ -119,10 +119,10 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
             'location', 'location_name', 'location_type',
             'batch', 'batch_details', 'batch_number',
             'movement_type', 'movement_type_display', 'quantity', 'status', 'status_display',
-            'occurred_at', 'user', 'user_username', 'notes',
+            'is_internal_transfer', 'occurred_at', 'user', 'user_username', 'notes',
             'related_composite_movement', 'related_movement_id'
         ]
-        read_only_fields = ['id', 'occurred_at', 'status']
+        read_only_fields = ['id', 'occurred_at']
 
     def validate_quantity(self, value):
         """Validar que la cantidad sea positiva."""
