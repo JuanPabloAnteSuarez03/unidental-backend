@@ -103,6 +103,7 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
     location_type = serializers.CharField(source='location.type', read_only=True)
     user_username = serializers.CharField(source='user.username', read_only=True)
     movement_type_display = serializers.CharField(source='get_movement_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     # Campos para lotes
     batch_details = ProductBatchSerializer(source='batch', read_only=True)
@@ -117,11 +118,11 @@ class InventoryMovementSerializer(serializers.ModelSerializer):
             'id', 'product', 'product_name', 'product_sku',
             'location', 'location_name', 'location_type',
             'batch', 'batch_details', 'batch_number',
-            'movement_type', 'movement_type_display', 'quantity',
+            'movement_type', 'movement_type_display', 'quantity', 'status', 'status_display',
             'occurred_at', 'user', 'user_username', 'notes',
             'related_composite_movement', 'related_movement_id'
         ]
-        read_only_fields = ['id', 'occurred_at']
+        read_only_fields = ['id', 'occurred_at', 'status']
 
     def validate_quantity(self, value):
         """Validar que la cantidad sea positiva."""

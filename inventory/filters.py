@@ -161,10 +161,16 @@ class InventoryMovementFilter(django_filters.FilterSet):
     # Filtros por usuario
     user_username = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
     
+    # Filtro por estado
+    status = django_filters.ChoiceFilter(
+        choices=InventoryMovement.STATUS_CHOICES,
+        help_text="Filtrar por estado del movimiento (pending, completed, cancelled)"
+    )
+
     class Meta:
         model = InventoryMovement
         fields = [
-            'movement_type', 'location', 'product',
+            'movement_type', 'location', 'product', 'status',
             'occurred_from', 'occurred_to', 'occurred_date',
             'expiry_from', 'expiry_to', 'has_expiry',
             'location_type', 'location_name',
