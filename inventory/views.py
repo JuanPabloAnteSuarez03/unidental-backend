@@ -589,6 +589,7 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
         operation_description="Obtener historial de movimientos con filtros",
         manual_parameters=[
             openapi.Parameter('movement_type', openapi.IN_QUERY, description="Tipo de movimiento (in/out)", type=openapi.TYPE_STRING),
+            openapi.Parameter('status', openapi.IN_QUERY, description="Estado del movimiento (pending, completed, cancelled)", type=openapi.TYPE_STRING),
             openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación", type=openapi.TYPE_INTEGER),
             openapi.Parameter('product', openapi.IN_QUERY, description="ID de producto", type=openapi.TYPE_INTEGER),
             openapi.Parameter('date_from', openapi.IN_QUERY, description="Fecha desde (YYYY-MM-DD)", type=openapi.TYPE_STRING),
@@ -599,18 +600,57 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
+        """
+        Sobrescribe el queryset para optimizar las consultas y aplicar filtros.
+        - Usar `select_related` para reducir consultas a `product`, `location` y `user`.
+        - Usar `prefetch_related` para el movimiento compuesto relacionado.
+        - Aplicar filtros personalizados desde los query params.
+        """
         queryset = super().get_queryset()
         
-        # Filtros por fecha
-        date_from = self.request.query_params.get('date_from')
-        date_to = self.request.query_params.get('date_to')
+        # Optimización de consultas
+        queryset = queryset.select_related(
+            'product__category', 'location', 'user', 'batch'
+        )
         
-        if date_from:
-            queryset = queryset.filter(occurred_at__date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(occurred_at__date__lte=date_to)
+        # Optimizar la consulta para obtener el producto relacionado si es un movimiento compuesto
+        queryset = queryset.prefetch_related('related_composite_movement__product')
         
         return queryset
+
+    @swagger_auto_schema(
+        method='post',
+        operation_summary="Marcar un movimiento como 'Completado'",
+        operation_description="Cambia el estado de un movimiento a 'completado', lo que afecta el stock.",
+        responses={
+            200: InventoryMovementSerializer,
+            404: "Movimiento no encontrado"
+        }
+    )
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        movement = self.get_object()
+        movement.status = 'completed'
+        movement.save()
+        serializer = self.get_serializer(movement)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='post',
+        operation_summary="Marcar un movimiento como 'Cancelado'",
+        operation_description="Cambia el estado de un movimiento a 'cancelado', revirtiendo el efecto en el stock si fue completado.",
+        responses={
+            200: InventoryMovementSerializer,
+            404: "Movimiento no encontrado"
+        }
+    )
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        movement = self.get_object()
+        movement.status = 'cancelled'
+        movement.save()
+        serializer = self.get_serializer(movement)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         method='get',
