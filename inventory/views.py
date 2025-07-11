@@ -570,7 +570,8 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
             required=['product', 'location', 'movement_type', 'quantity'],
             properties={
                 'product': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del producto"),
-                'location': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la ubicación"),
+                'location': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la ubicación de origen"),
+                'destination_location': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la ubicación de destino (requerido para transferencias)"),
                 'movement_type': openapi.Schema(type=openapi.TYPE_STRING, enum=['in', 'out'], description="Tipo de movimiento"),
                 'quantity': openapi.Schema(type=openapi.TYPE_INTEGER, description="Cantidad (positiva)"),
                 'status': openapi.Schema(type=openapi.TYPE_STRING, enum=['pending', 'completed'], description="Estado inicial (opcional, por defecto 'completed')"),
@@ -592,7 +593,8 @@ class InventoryMovementViewSet(viewsets.ModelViewSet):
         manual_parameters=[
             openapi.Parameter('movement_type', openapi.IN_QUERY, description="Tipo de movimiento (in/out)", type=openapi.TYPE_STRING),
             openapi.Parameter('status', openapi.IN_QUERY, description="Estado del movimiento (pending, completed, cancelled)", type=openapi.TYPE_STRING),
-            openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de ubicación de origen", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('destination_location', openapi.IN_QUERY, description="ID de ubicación de destino", type=openapi.TYPE_INTEGER),
             openapi.Parameter('product', openapi.IN_QUERY, description="ID de producto", type=openapi.TYPE_INTEGER),
             openapi.Parameter('date_from', openapi.IN_QUERY, description="Fecha desde (YYYY-MM-DD)", type=openapi.TYPE_STRING),
             openapi.Parameter('date_to', openapi.IN_QUERY, description="Fecha hasta (YYYY-MM-DD)", type=openapi.TYPE_STRING),
