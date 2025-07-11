@@ -159,6 +159,11 @@ class InventoryMovement(models.Model):
         default='completed',
         verbose_name="Estado"
     )
+    is_internal_transfer = models.BooleanField(
+        default=False,
+        verbose_name="Transferencia Interna",
+        help_text="Marcar si este movimiento es una transferencia entre bodegas/sedes."
+    )
     occurred_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de ocurrencia")
     user = models.ForeignKey(
         User, 
