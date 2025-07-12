@@ -126,6 +126,10 @@ class PurchaseOrderItemFilter(django_filters.FilterSet):
     )
     
     # Filtros por producto
+    product = django_filters.NumberFilter(
+        field_name='purchase_option__product__id',
+        help_text="Filtrar por ID del producto"
+    )
     product_name = django_filters.CharFilter(
         field_name='purchase_option__product__name',
         lookup_expr='icontains',

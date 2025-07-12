@@ -369,7 +369,8 @@ class PurchaseOrderItemViewSet(viewsets.ModelViewSet):
         'quantity_requested',
         'unit_price',
         'created_at',
-        'purchase_option__product__name'
+        'purchase_option__product__name',
+        'order__order_date'  # Añadir este campo para ordenar
     ]
     ordering = ['-created_at']
 
