@@ -3,6 +3,96 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from .validators import validate_sku
 
+# --- Modelos para la estructura del SKU ---
+
+class SkuCategory(models.Model):
+    """
+    Categoría principal para la construcción de un SKU.
+    Ej: ART (Artículos), TST (Test), LAB (Laboratorio).
+    """
+    code = models.CharField(
+        max_length=3, 
+        unique=True, 
+        verbose_name="Código de Categoría SKU",
+        help_text="Código único de 3 letras para la categoría del SKU (ej: ART)."
+    )
+    name = models.CharField(
+        max_length=100, 
+        verbose_name="Nombre de Categoría SKU",
+        help_text="Nombre descriptivo de la categoría del SKU."
+    )
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    class Meta:
+        verbose_name = "Categoría de SKU"
+        verbose_name_plural = "Categorías de SKU"
+        ordering = ['code']
+
+class SkuSubCategory(models.Model):
+    """
+    Subcategoría para la construcción de un SKU, dependiente de una Categoría.
+    Ej: PRE (Preventivos), NUE (Nuevos), YEP (Yesos).
+    """
+    category = models.ForeignKey(
+        SkuCategory, 
+        on_delete=models.CASCADE, 
+        related_name='subcategories', 
+        verbose_name="Categoría de SKU"
+    )
+    code = models.CharField(
+        max_length=3, 
+        verbose_name="Código de Subcategoría SKU",
+        help_text="Código de 3 letras para la subcategoría (único por categoría)."
+    )
+    name = models.CharField(
+        max_length=100, 
+        verbose_name="Nombre de Subcategoría SKU",
+        help_text="Nombre descriptivo de la subcategoría del SKU."
+    )
+
+    def __str__(self):
+        return f"{self.category.code}-{self.code} - {self.name}"
+
+    class Meta:
+        verbose_name = "Subcategoría de SKU"
+        verbose_name_plural = "Subcategorías de SKU"
+        unique_together = ['category', 'code']
+        ordering = ['category__code', 'code']
+
+class SkuType(models.Model):
+    """
+    Tipo para la construcción de un SKU, dependiente de una Subcategoría.
+    Ej: BIO (Bioseguridad), VAP (Varios), ELI (Elite).
+    """
+    subcategory = models.ForeignKey(
+        SkuSubCategory, 
+        on_delete=models.CASCADE, 
+        related_name='types', 
+        verbose_name="Subcategoría de SKU"
+    )
+    code = models.CharField(
+        max_length=3, 
+        verbose_name="Código de Tipo de SKU",
+        help_text="Código de 3 letras para el tipo (único por subcategoría)."
+    )
+    name = models.CharField(
+        max_length=100, 
+        verbose_name="Nombre de Tipo de SKU",
+        help_text="Nombre descriptivo del tipo de SKU."
+    )
+
+    def __str__(self):
+        return f"{self.subcategory.category.code}-{self.subcategory.code}-{self.code} - {self.name}"
+
+    class Meta:
+        verbose_name = "Tipo de SKU"
+        verbose_name_plural = "Tipos de SKU"
+        unique_together = ['subcategory', 'code']
+        ordering = ['subcategory__category__code', 'subcategory__code', 'code']
+
+
 # Create your models here.
 
 class Category(models.Model):
