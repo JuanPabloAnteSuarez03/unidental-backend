@@ -1,6 +1,29 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Category, Product, ProductComponent, ProductBatch
+from django.core.exceptions import ValidationError
+from .models import Category, Product, ProductComponent, ProductBatch, SkuCategory, SkuSubCategory, SkuType
+
+
+# --- Serializadores para la estructura del SKU ---
+
+class SkuCategorySerializer(serializers.ModelSerializer):
+    """Serializer para Categorías de SKU."""
+    class Meta:
+        model = SkuCategory
+        fields = ['id', 'code', 'name']
+
+class SkuSubCategorySerializer(serializers.ModelSerializer):
+    """Serializer para Subcategorías de SKU."""
+    class Meta:
+        model = SkuSubCategory
+        fields = ['id', 'category', 'code', 'name']
+
+class SkuTypeSerializer(serializers.ModelSerializer):
+    """Serializer para Tipos de SKU."""
+    class Meta:
+        model = SkuType
+        fields = ['id', 'subcategory', 'code', 'name']
+
 
 class CategorySerializer(serializers.ModelSerializer):
     """

@@ -1,16 +1,71 @@
 from django.shortcuts import render
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import api_view, permission_classes as perm_decorator, action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Q, Count
 from datetime import timedelta
-from .models import Category, Product, ProductComponent, ProductBatch
-from .serializers import CategorySerializer, ProductSerializer, ProductComponentSerializer, ProductBatchSerializer
+from .models import Category, Product, ProductComponent, ProductBatch, SkuCategory, SkuSubCategory, SkuType
+from .serializers import (
+    CategorySerializer, 
+    ProductSerializer, 
+    ProductComponentSerializer, 
+    ProductBatchSerializer,
+    SkuCategorySerializer,
+    SkuSubCategorySerializer,
+    SkuTypeSerializer
+)
 from .filters import CategoryFilter, ProductFilter
 from .validators import SKUValidator
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.contrib.auth.models import User
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+
+
+# --- ViewSets para la estructura del SKU ---
+
+class SkuCategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar Categorías de SKU.
+    Permite crear, leer, actualizar y eliminar categorías de SKU.
+    """
+    queryset = SkuCategory.objects.all()
+    serializer_class = SkuCategorySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['code', 'name']
+    ordering_fields = ['code', 'name']
+
+class SkuSubCategoryViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar Subcategorías de SKU.
+    Filtra por 'category' para obtener las subcategorías de una categoría específica.
+    Ejemplo: /api/catalogs/sku-subcategories/?category=1
+    """
+    queryset = SkuSubCategory.objects.all()
+    serializer_class = SkuSubCategorySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category']
+    search_fields = ['code', 'name']
+    ordering_fields = ['code', 'name']
+
+class SkuTypeViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar Tipos de SKU.
+    Filtra por 'subcategory' para obtener los tipos de una subcategoría específica.
+    Ejemplo: /api/catalogs/sku-types/?subcategory=5
+    """
+    queryset = SkuType.objects.all()
+    serializer_class = SkuTypeSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['subcategory']
+    search_fields = ['code', 'name']
+    ordering_fields = ['code', 'name']
+
 
 # Create your views here.
 
@@ -279,39 +334,22 @@ def sku_info(request):
 
 
 @swagger_auto_schema(
-    method='post',
-    operation_summary="Generar Siguiente SKU",
-    operation_description="Genera automáticamente el siguiente SKU disponible para una combinación de categoría, subcategoría y tipo/material dada. Utiliza el sistema optimizado basado en el inventario real de UNIDENTAL.",
-    request_body=openapi.Schema(
-        type=openapi.TYPE_OBJECT,
-        required=['categoria', 'subcategoria', 'tipo'],
-        properties={
-            'categoria': openapi.Schema(type=openapi.TYPE_STRING, description="Código de categoría (3 letras)", example="LAB"),
-            'subcategoria': openapi.Schema(type=openapi.TYPE_STRING, description="Código de subcategoría (3 letras)", example="ART"),
-            'tipo': openapi.Schema(type=openapi.TYPE_STRING, description="Código de tipo/material (3 letras)", example="BIO")
-        },
-        example={
-            "categoria": "ANE",
-            "subcategoria": "CAR", 
-            "tipo": "SEP"
-        }
-    ),
-    responses={
-        200: openapi.Response(
-            description="SKU generado exitosamente",
-            schema=openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={
-                    'sku_sugerido': openapi.Schema(type=openapi.TYPE_STRING, description="El siguiente SKU disponible", example="ANE-CAR-SEP-002"),
-                    'categoria_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre de la categoría"),
-                    'subcategoria_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre de la subcategoría"),
-                    'tipo_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre del tipo/material")
-                }
-            )
-        ),
-        400: "Bad Request - Categoría o subcategoría inválida"
-    }
+    method='get',
+    operation_summary="Obtener estructura y componentes de SKU",
+    operation_description="Devuelve la estructura de SKUs y los componentes existentes para construir selectores en el frontend.",
 )
+@api_view(['GET'])
+@perm_decorator([permissions.IsAuthenticated])
+def get_sku_structure(request):
+    """
+    Endpoint para obtener la estructura de SKU y los componentes existentes.
+    """
+    # Esta función ahora podría ser un endpoint de API que serialice los modelos
+    # para mostrar las opciones disponibles en el frontend.
+    data = SKUValidator.get_sku_structure_info()
+    return Response(data)
+
+
 @api_view(['POST'])
 @perm_decorator([permissions.IsAuthenticated])
 def generate_sku(request):

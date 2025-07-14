@@ -20,6 +20,8 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from core.views import health_check
+from django.conf import settings
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -42,11 +44,15 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('api/auth/', include('djoser.urls')),
     path('api/auth/', include('djoser.urls.authtoken')),
+    path('api/users/', include('users.urls')),
+    path('api/core/', include('core.urls')),
     path('api/catalogs/', include('catalogs.urls')),
-    path('api/suppliers/', include('suppliers.urls')),
     path('api/inventory/', include('inventory.urls')),
-    path('api/purchases/', include('purchases.urls')),
     path('api/sales/', include('sales.urls')),
+    path('api/suppliers/', include('suppliers.urls')),
+    path('api/purchases/', include('purchases.urls')),
     path('api/credits/', include('credits.urls')),
     path('api/deliveries/', include('deliveries.urls')),
 ]
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

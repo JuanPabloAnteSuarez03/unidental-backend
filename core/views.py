@@ -1,39 +1,47 @@
-from django.shortcuts import render
-from django.http import JsonResponse
-from django.db import connection
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-import time
+from rest_framework import status
+from django.db import connection, DatabaseError
+from django.core.cache import cache
 
-# Create your views here.
 
 @api_view(['GET'])
-@permission_classes([AllowAny])  # Permitir acceso sin autenticación
-def health_check(request):
+@permission_classes([AllowAny])
+def health_check_view(request):
     """
-    Endpoint público para verificar el estado de la aplicación.
-    No requiere autenticación - para uso de Railway healthcheck.
-    """
-    start_time = time.time()
+    Endpoint de Health Check para verificar el estado de los servicios críticos.
     
+    Verifica:
+    - Conexión a la base de datos.
+    - Funcionamiento del sistema de caché.
+    
+    Devuelve un estado 200 OK si todos los servicios están operativos,
+    o un 503 Service Unavailable si alguno de los servicios críticos falla.
+    """
+    services_status = {
+        'database': 'ok',
+        'cache': 'ok'
+    }
+    overall_status = status.HTTP_200_OK
+
+    # 1. Verificar la conexión a la base de datos
     try:
-        # Verificar conexión a la base de datos
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
-            db_status = "healthy"
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
-    
-    response_time = (time.time() - start_time) * 1000
-    
-    health_data = {
-        "status": "healthy" if db_status == "healthy" else "unhealthy",
-        "database": db_status,
-        "response_time_ms": round(response_time, 2),
-        "timestamp": time.time()
-    }
-    
-    status_code = 200 if db_status == "healthy" else 503
-    
-    return JsonResponse(health_data, status=status_code)
+    except DatabaseError:
+        services_status['database'] = 'error'
+        overall_status = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    # 2. Verificar la caché
+    try:
+        cache.set('health_check_test', 'ok', timeout=10)
+        cached_value = cache.get('health_check_test')
+        if cached_value != 'ok':
+            raise Exception("Valor de caché no coincide")
+        cache.delete('health_check_test')
+    except Exception:
+        services_status['cache'] = 'error'
+        overall_status = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return Response(services_status, status=overall_status)

@@ -10,7 +10,10 @@ from django.utils import timezone
 from django.db.models.signals import post_delete
 
 # Import all models
-from catalogs.models import Category, Product, ProductBatch
+from catalogs.models import (
+    Category, Product, ProductBatch, 
+    SkuCategory, SkuSubCategory, SkuType
+)
 from catalogs.validators import SKUValidator
 from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location, InventoryStock, InventoryMovement
@@ -63,6 +66,9 @@ class Command(BaseCommand):
             # Si falla, ignorar y continuar. Los caracteres no representables se reemplazarán.
             pass
         self.validator = SKUValidator()
+        # Define la categoría por defecto por separado para mayor claridad
+        self.default_category = ('ORG', 'Organización y Oficina', 'VAR', 'Varios', 'GEN', 'General')
+        # Crea el mapeo ordenado de categorías para una detección más precisa
         self.category_mapping = self._create_category_mapping()
         
         # Contadores para estadísticas
@@ -76,131 +82,172 @@ class Command(BaseCommand):
             'purchase_order_items_created': 0,
             'inventory_stock_created': 0,
             'inventory_movements_created': 0,
+            'sku_categories_created': 0,
+            'sku_subcategories_created': 0,
+            'sku_types_created': 0,
         }
         self.errors = []
         self.supplier_cache = {}
         self.category_cache = {}
         self.location_cache = {}
+        self.sku_category_cache = {}
+        self.sku_subcategory_cache = {}
+        self.sku_type_cache = {}
 
     def _create_category_mapping(self):
         """
-        Mapea palabras clave del inventario a categorías del sistema SKU.
+        Crea una lista ordenada de mapeo de palabras clave a categorías.
+        Las palabras clave más largas y específicas se priorizan automáticamente
+        al ordenar el diccionario por la longitud de la clave.
         """
-        return {
+        mapping_dict = {
             # Accesorios y Complementos (ACE)
-            'abreboca': ('ACE', 'DES', 'PLA'),
-            'guantes': ('ACE', 'GUA', 'LAT'),
-            'babero': ('ACE', 'BAB', 'DES'),
-            'gorro': ('ACE', 'BAB', 'DES'),
-            'contenedor': ('ACE', 'CON', 'PLA'),
-            'caja': ('ACE', 'CON', 'PLA'),
-            
+            'abreboca': ('ACE', 'Accesorios y Complementos', 'DES', 'Desechables', 'PLA', 'Plástico'),
+            'guantes': ('ACE', 'Accesorios y Complementos', 'GUA', 'Guantes', 'LAT', 'Látex'),
+            'babero': ('ACE', 'Accesorios y Complementos', 'BAB', 'Baberos', 'DES', 'Desechable'),
+            'gorro': ('ACE', 'Accesorios y Complementos', 'BAB', 'Baberos', 'DES', 'Desechable'),
+            'eyector': ('ACE', 'Accesorios y Complementos', 'SUC', 'Succión', 'DES', 'Desechable'),
+
             # Anestesia y Control de Dolor (ANE)
-            'anestesia': ('ANE', 'CAR', 'SEP'),
-            'lidocaina': ('ANE', 'CAR', 'SEP'),
-            'articaina': ('ANE', 'CAR', 'SEP'),
-            'mepivacaina': ('ANE', 'CAR', 'SEP'),
-            'topico': ('ANE', 'TOP', 'GEL'),
-            'aguja': ('ANE', 'AGU', 'MET'),
-            
+            'anestesia': ('ANE', 'Anestesia y Control de Dolor', 'CAR', 'Cartuchos', 'SEP', 'Septodont'),
+            'lidocaina': ('ANE', 'Anestesia y Control de Dolor', 'CAR', 'Cartuchos', 'LID', 'Lidocaína'),
+            'articaina': ('ANE', 'Anestesia y Control de Dolor', 'CAR', 'Cartuchos', 'ART', 'Articaína'),
+            'mepivacaina': ('ANE', 'Anestesia y Control de Dolor', 'CAR', 'Cartuchos', 'MEP', 'Mepivacaína'),
+            'topico': ('ANE', 'Anestesia y Control de Dolor', 'TOP', 'Tópicos', 'GEL', 'Gel'),
+            'aguja': ('ANE', 'Anestesia y Control de Dolor', 'AGU', 'Agujas', 'MET', 'Metálicas'),
+
             # Materiales de Restauración (RES)
-            'adhesivo': ('RES', 'ADH', 'M3M'),
-            'composite': ('RES', 'COM', 'M3M'),
-            'resina': ('RES', 'COM', 'KER'),
-            'cemento': ('RES', 'CEM', 'GC'),
-            'ionomero': ('RES', 'ION', 'GC'),
-            'acrilico': ('RES', 'ACR', 'NEW'),
+            'resina': ('RES', 'Materiales de Restauración', 'RES', 'Resinas', 'COM', 'Composite'),
+            'composite': ('RES', 'Materiales de Restauración', 'RES', 'Resinas', 'COM', 'Composite'),
+            'adhesivo': ('RES', 'Materiales de Restauración', 'ADH', 'Adhesivos', 'UNI', 'Universal'),
+            'ionomero': ('RES', 'Materiales de Restauración', 'ION', 'Ionómeros', 'VIT', 'Vidrio'),
+            'cemento': ('RES', 'Materiales de Restauración', 'CEM', 'Cementos', 'RES', 'Resinoso'),
             
             # Materiales de Impresión (IMP)
-            'alginato': ('IMP', 'ALG', 'ZHE'),
-            'silicona': ('IMP', 'SIL', 'ZHE'),
-            'godiva': ('IMP', 'GOD', 'KEL'),
-            'cubeta': ('IMP', 'CUB', 'PLA'),
-            'impresion': ('IMP', 'ALG', 'ZHE'),
-            
+            'alginato': ('IMP', 'Materiales de Impresión', 'ALG', 'Alginatos', 'CRO', 'Cromático'),
+            'silicona': ('IMP', 'Materiales de Impresión', 'SIL', 'Siliconas', 'ADI', 'Adición'),
+            'polivinil': ('IMP', 'Materiales de Impresión', 'SIL', 'Siliconas', 'PVS', 'Polivinil Siloxano'),
+            'cubeta': ('IMP', 'Materiales de Impresión', 'CUB', 'Cubetas', 'PLA', 'Plástico'),
+
             # Endodoncia (END)
-            'lima': ('END', 'LIM', 'GAT'),
-            'hidroxido': ('END', 'HID', 'ANG'),
-            'irrigacion': ('END', 'IRR', 'HIP'),
-            'obturacion': ('END', 'OBT', 'ANG'),
-            'gutapercha': ('END', 'GUT', 'MAQ'),
-            'endodoncia': ('END', 'LIM', 'GAT'),
+            'limas': ('END', 'Endodoncia', 'LIM', 'Limas', 'MAN', 'Manuales'),
+            'cono': ('END', 'Endodoncia', 'CON', 'Conos', 'GUT', 'Gutapercha'),
+            'gutapercha': ('END', 'Endodoncia', 'CON', 'Conos', 'GUT', 'Gutapercha'),
+            'tiranervios': ('END', 'Endodoncia', 'TIR', 'Tiranervios', 'MAN', 'Manual'),
             
             # Periodoncia y Cirugía (PER)
-            'cureta': ('PER', 'CUR', 'HUF'),
-            'bisturi': ('PER', 'BIS', 'ACE'),
-            'sutura': ('PER', 'SUT', 'VIC'),
-            'hemostatico': ('PER', 'HEM', 'COL'),
-            'grapa': ('PER', 'GRA', 'MET'),
-            
+            'sutura': ('PER', 'Periodoncia y Cirugía', 'SUT', 'Suturas', 'ABS', 'Absorbibles'),
+            'hoja de bisturi': ('PER', 'Periodoncia y Cirugía', 'BIS', 'Bisturí', 'DES', 'Desechable'),
+            'bisturi': ('PER', 'Periodoncia y Cirugía', 'BIS', 'Bisturí', 'DES', 'Desechable'),
+            'periostotomo': ('PER', 'Periodoncia y Cirugía', 'INS', 'Instrumental', 'MET', 'Metálico'),
+
             # Blanqueamiento (BLA)
-            'aclaramiento casero': ('BLA', 'CAS', 'ULT'),
-            'aclaramiento consultorio': ('BLA', 'CON', 'FGM'),
-            'blanqueamiento': ('BLA', 'CAS', 'ULT'),
-            'barrera gingival': ('BLA', 'BAR', 'ULT'),
-            'aclaramiento': ('BLA', 'CON', 'FGM'),
-            
+            'blanqueamiento': ('BLA', 'Blanqueamiento', 'KIT', 'Kits', 'DOM', 'Doméstico'),
+            'peroxido': ('BLA', 'Blanqueamiento', 'PER', 'Peróxidos', 'CAR', 'Carbamida'),
+            'opalescence': ('BLA', 'Blanqueamiento', 'KIT', 'Kits', 'OPA', 'Opalescence'),
+            'whiteness': ('BLA', 'Blanqueamiento', 'KIT', 'Kits', 'FGM', 'FGM'),
+            'clareamiento': ('BLA', 'Blanqueamiento', 'KIT', 'Kits', 'DOM', 'Doméstico'),
+
             # Profilaxis y Prevención (PRO)
-            'piedra': ('PRO', 'PIE', 'POL'),
-            'pasta': ('PRO', 'PIE', 'POL'),
-            'fluor': ('PRO', 'FLU', 'FGM'),
-            'barniz': ('PRO', 'FLU', 'COL'),
-            'cepillo': ('PRO', 'CEP', 'ORA'),
-            'hilo dental': ('PRO', 'HIL', 'ORA'),
-            'profilaxis': ('PRO', 'PIE', 'POL'),
+            'profilaxis': ('PRO', 'Profilaxis y Prevención', 'PAS', 'Pastas', 'FLU', 'Fluorada'),
+            'cepillo': ('PRO', 'Profilaxis y Prevención', 'CEP', 'Cepillos', 'PRO', 'Profilaxis'),
+            'fluor': ('PRO', 'Profilaxis y Prevención', 'FLU', 'Flúor', 'GEL', 'Gel'),
             
             # Laboratorio (LAB)
-            'articulador': ('LAB', 'ART', 'BIO'),
-            'yeso': ('LAB', 'YEP', 'ELI'),
-            'modelo': ('LAB', 'MOD', 'YEP'),
-            'fresa': ('LAB', 'FRE', 'NSK'),
-            'platina': ('LAB', 'YEP', 'ELI'),
-            'laboratorio': ('LAB', 'ART', 'BIO'),
+            'articulador': ('LAB', 'Laboratorio', 'ART', 'Articuladores', 'BIO', 'Bio-Art'),
+            'yeso': ('LAB', 'Laboratorio', 'YEP', 'Yesos', 'ELI', 'Elite'),
+            'modelo': ('LAB', 'Laboratorio', 'MOD', 'Modelos', 'YEP', 'Yeso'),
+            'fresa': ('LAB', 'Laboratorio', 'FRE', 'Fresas', 'NSK', 'NSK'),
+            'platina': ('LAB', 'Laboratorio', 'PLA', 'Platinas', 'MET', 'Metálicas'),
             
             # Desinfección y Esterilización (DES)
-            'glutaraldehido': ('DES', 'GUT', 'CID'),
-            'hipoclorito': ('DES', 'HIP', 'NAO'),
-            'enzimatico': ('DES', 'ENZ', 'END'),
-            'bolsa esterilizacion': ('DES', 'BOL', 'CRO'),
-            'indicador biologico': ('DES', 'IND', 'M3M'),
-            'desinfeccion': ('DES', 'GUT', 'CID'),
-            'alcohol': ('DES', 'HIP', 'VAR'),
-            
+            'desinfectante': ('DES', 'Desinfección y Esterilización', 'LIQ', 'Líquidos', 'SUP', 'Superficies'),
+            'autoclave': ('DES', 'Desinfección y Esterilización', 'EQU', 'Equipos', 'AUT', 'Autoclave'),
+            'bolsa esterilizacion': ('DES', 'Desinfección y Esterilización', 'BOL', 'Bolsas', 'AUT', 'Autosellable'),
+
             # Organización y Oficina (ORG)
-            'papel': ('ORG', 'PAP', 'VAR'),
-            'limpieza': ('ORG', 'LIM', 'VAR'),
-            'organizador': ('ORG', 'ALM', 'VAR'),
-            'bolsa': ('ORG', 'BOL', 'PLA'),
-            'papeleria': ('ORG', 'PAP', 'VAR'),
-            'aceite': ('ORG', 'LIM', 'VAR'),
-            
+            'organizacion': ('ORG', 'Organización y Oficina', 'VAR', 'Varios', 'GEN', 'General'),
+            'oficina': ('ORG', 'Organización y Oficina', 'VAR', 'Varios', 'GEN', 'General'),
+
             # Ortodoncia (ORT)
-            'alambre': ('ORT', 'ALA', 'TIT'),
-            'cadeneta': ('ORT', 'CAD', 'ELA'),
-            'boton': ('ORT', 'BOT', 'MET'),
-            'banda': ('ORT', 'BAN', 'M3M'),
-            'arco': ('ORT', 'ARC', 'NIT'),
-            'ortodoncia': ('ORT', 'ALA', 'TIT'),
+            'bracket': ('ORT', 'Ortodoncia', 'BRA', 'Brackets', 'MET', 'Metálicos'),
+            'arco': ('ORT', 'Ortodoncia', 'ARC', 'Arcos', 'NIT', 'Niti'),
+            'ligadura': ('ORT', 'Ortodoncia', 'LIG', 'Ligaduras', 'ELA', 'Elásticas'),
         }
+        
+        # Ordenar el mapeo por la longitud de la palabra clave, de más larga a más corta.
+        # Esto asegura que "hoja de bisturi" se verifique antes que "bisturi".
+        sorted_mapping = sorted(
+            mapping_dict.items(),
+            key=lambda item: len(item[0]),
+            reverse=True
+        )
+        return sorted_mapping
+
 
     def _categorize_product(self, product_name):
         """
-        Categoriza un producto basándose en su nombre.
+        Categoriza un producto basándose en su nombre usando un mapeo ordenado
+        y expresiones regulares para mayor precisión.
         """
         name_lower = product_name.lower()
         
-        # Buscar coincidencias en el mapeo
-        for keyword, (categoria, subcategoria, tipo) in self.category_mapping.items():
-            if keyword in name_lower:
-                return categoria, subcategoria, tipo
+        # Buscar coincidencias en el mapeo ordenado (de más específico a menos)
+        for keyword, data in self.category_mapping:
+            # Usar \b para asegurar que se buscan palabras completas.
+            # Evita que 'art' en 'cartucho' coincida con 'art' de 'articulador'.
+            if re.search(r'\b' + re.escape(keyword) + r'\b', name_lower):
+                return data # Retorna la tupla de datos (cat_code, cat_name, ...)
         
-        # Categorización por defecto basada en palabras clave generales
-        if any(word in name_lower for word in ['dental', 'diente', 'oral']):
-            return 'PRO', 'PIE', 'GEN'
-        elif any(word in name_lower for word in ['medico', 'clinico', 'hospital']):
-            return 'ACE', 'INS', 'MED'
-        else:
-            return 'ORG', 'VAR', 'GEN'
+        # Devolver el por defecto si no hay coincidencias
+        return self.default_category
+
+    def _get_or_create_sku_components(self, cat_code, cat_name, sub_code, sub_name, type_code, type_name):
+        """
+        Obtiene o crea los componentes del SKU y los devuelve.
+        Usa un caché para evitar consultas repetidas a la base de datos.
+        """
+        # Categoría
+        if cat_code not in self.sku_category_cache:
+            sku_cat, created = SkuCategory.objects.get_or_create(
+                code=cat_code,
+                defaults={'name': cat_name}
+            )
+            self.sku_category_cache[cat_code] = sku_cat
+            if created:
+                self.stats['sku_categories_created'] += 1
+                self.stdout.write(f"  ✓ Nueva Categoría SKU: '{cat_name}' ({cat_code})")
+        sku_cat = self.sku_category_cache[cat_code]
+
+        # Subcategoría
+        sub_key = (sku_cat.id, sub_code)
+        if sub_key not in self.sku_subcategory_cache:
+            sku_sub, created = SkuSubCategory.objects.get_or_create(
+                category=sku_cat,
+                code=sub_code,
+                defaults={'name': sub_name}
+            )
+            self.sku_subcategory_cache[sub_key] = sku_sub
+            if created:
+                self.stats['sku_subcategories_created'] += 1
+                self.stdout.write(f"    - Subcategoría: '{sub_name}' ({sub_code}) en '{cat_name}'")
+        sku_sub = self.sku_subcategory_cache[sub_key]
+
+        # Tipo
+        type_key = (sku_sub.id, type_code)
+        if type_key not in self.sku_type_cache:
+            sku_type, created = SkuType.objects.get_or_create(
+                subcategory=sku_sub,
+                code=type_code,
+                defaults={'name': type_name}
+            )
+            self.sku_type_cache[type_key] = sku_type
+            if created:
+                self.stats['sku_types_created'] += 1
+                self.stdout.write(f"      - Tipo: '{type_name}' ({type_code}) en '{sub_name}'")
+        sku_type = self.sku_type_cache[type_key]
+        
+        return sku_cat, sku_sub, sku_type
 
     def _parse_date(self, date_str):
         """
@@ -586,75 +633,85 @@ class Command(BaseCommand):
         products_to_create = []
         data_for_related_objects = []
         
-        with open(csv_file_path, 'r', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader)  # Saltar header
-            
-            existing_skus = set(Product.objects.values_list('sku', flat=True))
-            
-            for row_num, row in enumerate(reader, 1):
-                try:
-                    if len(row) < 12:
-                        continue
-                    
-                    product_name = row[0].strip()
-                    if not product_name or product_name.startswith('NO USAR'): continue
-                    
-                    # Extraer referencias para la descripción
-                    referencias = row[1].strip() if len(row) > 1 else ''
-                    
-                    cat_info = self._categorize_product(product_name)
-                    sku = self.validator.generate_next_sku(cat_info[0], cat_info[1], cat_info[2], existing_skus)
-                    existing_skus.add(sku)
-                    
-                    fecha_vencimiento = self._parse_date(row[9].strip())
-                    requires_batch = fecha_vencimiento is not None
-
-                    sale_price_val = self._clean_price(row[11].strip()) if len(row) > 11 else None
-                    
-                    # Crear descripción con referencias si están disponibles
-                    description = ""
-                    if referencias and referencias.lower() != 'referencias':
-                        description = referencias
-                    cat_name = self.validator.CATEGORIAS.get(cat_info[0], cat_info[0])
-                    if cat_name not in self.category_cache:
-                        category = Category.objects.create(name=cat_name, description=f"Categoría {cat_name}")
-                        self.category_cache[cat_name] = category
-                    
-                    product = Product(
-                        sku=sku,
-                        name=product_name,
-                        description=description,
-                        unit='unidad', # Simplificado para el script
-                        category_id=self.category_cache[cat_name].id,
-                        requires_batch_control=requires_batch,
-                        sale_price=sale_price_val
-                    )
-                    products_to_create.append(product)
-                    
-                    # Guardar datos adicionales para las siguientes fases
-                    data_for_related_objects.append({
-                        'sku': sku,
-                        'product_obj': product,
-                        'fecha_vencimiento': fecha_vencimiento,
-                        'supplier_name': self._extract_supplier_name(row[6].strip()),
-                        'precio_compra': self._clean_price(row[10].strip()),
-                        'precio_venta': sale_price_val,
-                        'stock_sur': self._clean_stock_quantity(row[7].strip(), row_num),
-                        'stock_norte': self._clean_stock_quantity(row[8].strip(), row_num),
-                    })
-                    
-                    if row_num % 500 == 0:
-                        self.stdout.write(f"  - {row_num} filas leídas del CSV...")
-
-                except Exception as e:
-                    self.errors.append(f"Línea {row_num}: Error procesando '{row[0]}': {e}")
-        
-        self.stdout.write(f"ℹ️  {len(products_to_create)} productos listos para ser creados.")
-
-        # Fase 2: Creación masiva
         try:
             with transaction.atomic():
+                with open(csv_file_path, 'r', encoding='utf-8') as file:
+                    reader = csv.reader(file)
+                    next(reader)  # Saltar header
+                    
+                    existing_skus = set(Product.objects.values_list('sku', flat=True))
+                    
+                    self.stdout.write("\n🔧 Creando componentes SKU (categorías, subcategorías, tipos):")
+
+                    for row_num, row in enumerate(reader, 1):
+                        try:
+                            if len(row) < 12:
+                                continue
+                            
+                            product_name = row[0].strip()
+                            if not product_name or product_name.startswith('NO USAR'): continue
+                            
+                            # Extraer referencias para la descripción
+                            referencias = row[1].strip() if len(row) > 1 else ''
+                            
+                            cat_code, cat_name, sub_code, sub_name, type_code, type_name = self._categorize_product(product_name)
+                            self._get_or_create_sku_components(cat_code, cat_name, sub_code, sub_name, type_code, type_name)
+                            
+                            base_sku = f"{cat_code}-{sub_code}-{type_code}"
+                            sku = self.validator.generate_next_sku(base_sku, existing_skus)
+                            existing_skus.add(sku)
+                            
+                            fecha_vencimiento = self._parse_date(row[9].strip())
+                            requires_batch = fecha_vencimiento is not None
+
+                            sale_price_val = self._clean_price(row[11].strip()) if len(row) > 11 else None
+                            
+                            # Crear descripción con referencias si están disponibles
+                            description = ""
+                            if referencias and referencias.lower() != 'referencias':
+                                description = referencias
+                            
+                            if cat_name not in self.category_cache:
+                                category, created = Category.objects.get_or_create(
+                                    name=cat_name,
+                                    defaults={'description': f"Categoría general para {cat_name}"}
+                                )
+                                self.category_cache[cat_name] = category
+                            else:
+                                category = self.category_cache[cat_name]
+                            
+                            product = Product(
+                                sku=sku,
+                                name=product_name,
+                                description=description,
+                                unit='unidad', # Simplificado para el script
+                                category_id=category.id,
+                                requires_batch_control=requires_batch,
+                                sale_price=sale_price_val
+                            )
+                            products_to_create.append(product)
+                            
+                            # Guardar datos adicionales para las siguientes fases
+                            data_for_related_objects.append({
+                                'sku': sku,
+                                'product_obj': product,
+                                'fecha_vencimiento': fecha_vencimiento,
+                                'supplier_name': self._extract_supplier_name(row[6].strip()),
+                                'precio_compra': self._clean_price(row[10].strip()),
+                                'precio_venta': sale_price_val,
+                                'stock_sur': self._clean_stock_quantity(row[7].strip(), row_num),
+                                'stock_norte': self._clean_stock_quantity(row[8].strip(), row_num),
+                            })
+                            
+                            if row_num % 500 == 0:
+                                self.stdout.write(f"  - {row_num} filas leídas del CSV...")
+
+                        except Exception as e:
+                            self.errors.append(f"Línea {row_num}: Error procesando '{row[0]}': {e}")
+                
+                self.stdout.write(f"ℹ️  {len(products_to_create)} productos listos para ser creados.")
+
+                # Fase 2: Creación masiva
                 # Crear Productos
                 self.stdout.write("\n📦 Creando productos en masa...")
                 Product.objects.bulk_create(products_to_create, batch_size=500)
@@ -858,9 +915,12 @@ class Command(BaseCommand):
         self.stdout.write(f"📑 Órdenes de compra creadas: {self.stats['purchase_orders_created']}")
         self.stdout.write(f"🛒 Ítems de órdenes creados: {self.stats['purchase_order_items_created']}")
         self.stdout.write(f"📊 Stocks de inventario creados: {self.stats['inventory_stock_created']}")
+        self.stdout.write(f"- Categorías de SKU creadas: {self.stats['sku_categories_created']}")
+        self.stdout.write(f"- Subcategorías de SKU creadas: {self.stats['sku_subcategories_created']}")
+        self.stdout.write(f"- Tipos de SKU creados: {self.stats['sku_types_created']}")
         
         if self.errors:
-            self.stdout.write(f"\n⚠️  Errores encontrados durante la lectura: {len(self.errors)}")
+            self.stdout.write(self.style.ERROR("\nSe encontraron los siguientes errores durante la importación:"))
             for error in self.errors[:10]:
                 self.stdout.write(f"  • {error}")
             if len(self.errors) > 10:

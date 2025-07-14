@@ -120,7 +120,7 @@ class InventoryMovement(models.Model):
         ('composite_conversion', 'Conversión de Producto Compuesto'),
         ('composite_assembly', 'Ensamblaje de Compuesto'),
     ]
-
+    
     STATUS_CHOICES = [
         ('pending', 'Pendiente'),
         ('completed', 'Completado'),
@@ -241,7 +241,7 @@ class InventoryMovement(models.Model):
 
         if self.is_internal_transfer and self.movement_type == 'out' and not self.destination_location:
             raise ValidationError({'destination_location': 'Se requiere una ubicación de destino para las transferencias de salida.'})
-
+    
     def save(self, *args, **kwargs):
         """
         Actualiza el stock automáticamente basado en el estado del movimiento.
@@ -261,7 +261,7 @@ class InventoryMovement(models.Model):
         # Caso 1: Un movimiento se marca como 'completed'
         if self.status == 'completed' and old_status != 'completed':
             self._update_stock()
-
+        
             # Si es una transferencia, crear el movimiento de entrada correspondiente
             if self.is_internal_transfer and self.destination_location and self.movement_type == 'out':
                 if not InventoryMovement.objects.filter(related_transfer_movement=self).exists():
@@ -279,9 +279,9 @@ class InventoryMovement(models.Model):
                     )
 
             # Manejar productos compuestos solo cuando el movimiento principal se completa
-            if self.product.is_composite() and self.movement_type in ['in', 'out']:
-                self._handle_composite_movement()
-
+        if self.product.is_composite() and self.movement_type in ['in', 'out']:
+            self._handle_composite_movement()
+    
         # Caso 2: Un movimiento 'completed' se cambia (ej. a 'cancelled' o 'pending')
         elif self.status != 'completed' and old_status == 'completed':
             self._revert_stock_update()
