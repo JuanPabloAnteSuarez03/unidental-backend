@@ -314,7 +314,7 @@ class InventoryMovement(models.Model):
             stock.quantity += self.quantity
         
         stock.save()
-
+    
     def _update_stock(self):
         """Actualiza el stock según el movimiento."""
         # Obtener o crear el registro de stock

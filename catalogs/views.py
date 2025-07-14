@@ -305,7 +305,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 @swagger_auto_schema(
     method='get',
     operation_summary="Información del Sistema SKU",
-    operation_description="Obtiene la documentación completa del sistema de SKU de Unidental, incluyendo categorías, subcategorías, tipos de materiales y reglas de formato.",
+    operation_description="Obtiene la documentación completa del sistema de SKU de Unidental, incluyendo categorías, subcategorías, tipos de materiales y reglas de formato desde la base de datos.",
     responses={
         200: openapi.Response(
             description="Información del sistema SKU",
@@ -314,10 +314,26 @@ class ProductViewSet(viewsets.ModelViewSet):
                 properties={
                     'formato': openapi.Schema(type=openapi.TYPE_STRING, description="Formato del SKU"),
                     'ejemplo': openapi.Schema(type=openapi.TYPE_STRING, description="Ejemplo de SKU válido"),
-                    'categorias': openapi.Schema(type=openapi.TYPE_OBJECT, description="Categorías disponibles"),
-                    'subcategorias': openapi.Schema(type=openapi.TYPE_OBJECT, description="Subcategorías por categoría"),
-                    'tipos_materiales': openapi.Schema(type=openapi.TYPE_OBJECT, description="Tipos y materiales disponibles"),
-                    'reglas': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_STRING), description="Reglas del sistema SKU")
+                    'categorias': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Categorías disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                    'subcategorias': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Subcategorías disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                    'tipos': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Tipos disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                    'reglas': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        items=openapi.Schema(type=openapi.TYPE_STRING), 
+                        description="Reglas del sistema SKU"
+                    )
                 }
             )
         )
@@ -330,62 +346,239 @@ def sku_info(request):
     Endpoint para obtener información completa del sistema de SKU.
     Útil para que los empleados conozcan las reglas y categorías disponibles.
     """
-    return Response(SKUValidator.get_sku_structure_info())
+    # Obtener todas las categorías con sus subcategorías y tipos
+    categorias = []
+    for categoria in SkuCategory.objects.all():
+        cat_data = {
+            'id': categoria.id,
+            'code': categoria.code,
+            'name': categoria.name,
+            'subcategorias': []
+        }
+        
+        for subcategoria in categoria.subcategories.all():
+            sub_data = {
+                'id': subcategoria.id,
+                'code': subcategoria.code,
+                'name': subcategoria.name,
+                'tipos': []
+            }
+            
+            for tipo in subcategoria.types.all():
+                sub_data['tipos'].append({
+                    'id': tipo.id,
+                    'code': tipo.code,
+                    'name': tipo.name
+                })
+            
+            cat_data['subcategorias'].append(sub_data)
+        
+        categorias.append(cat_data)
+    
+    # Obtener todas las subcategorías
+    subcategorias = []
+    for subcategoria in SkuSubCategory.objects.select_related('category').all():
+        subcategorias.append({
+            'id': subcategoria.id,
+            'code': subcategoria.code,
+            'name': subcategoria.name,
+            'category_id': subcategoria.category.id,
+            'category_name': subcategoria.category.name
+        })
+    
+    # Obtener todos los tipos
+    tipos = []
+    for tipo in SkuType.objects.select_related('subcategory__category').all():
+        tipos.append({
+            'id': tipo.id,
+            'code': tipo.code,
+            'name': tipo.name,
+            'subcategory_id': tipo.subcategory.id,
+            'subcategory_name': tipo.subcategory.name,
+            'category_id': tipo.subcategory.category.id,
+            'category_name': tipo.subcategory.category.name
+        })
+    
+    return Response({
+        'formato': 'CATEGORIA-SUBCATEGORIA-TIPO-SECUENCIAL',
+        'ejemplo': 'LAB-ART-BIO-001',
+        'categorias': categorias,
+        'subcategorias': subcategorias,
+        'tipos': tipos,
+        'reglas': [
+            'El SKU debe seguir el formato: CATEGORIA-SUBCATEGORIA-TIPO-SECUENCIAL',
+            'Cada componente debe tener exactamente 3 caracteres',
+            'El secuencial debe ser un número de 3 dígitos con ceros a la izquierda',
+            'Todos los códigos deben estar en mayúsculas',
+            'Los componentes deben existir en la base de datos'
+        ]
+    })
 
 
 @swagger_auto_schema(
     method='get',
     operation_summary="Obtener estructura y componentes de SKU",
-    operation_description="Devuelve la estructura de SKUs y los componentes existentes para construir selectores en el frontend.",
+    operation_description="Devuelve la estructura de SKUs y los componentes existentes desde la base de datos para construir selectores en el frontend.",
+    responses={
+        200: openapi.Response(
+            description="Estructura de SKU obtenida exitosamente",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'categorias': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Categorías de SKU disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                    'subcategorias': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Subcategorías de SKU disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    ),
+                    'tipos': openapi.Schema(
+                        type=openapi.TYPE_ARRAY, 
+                        description="Tipos de SKU disponibles",
+                        items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                    )
+                }
+            )
+        )
+    }
 )
 @api_view(['GET'])
 @perm_decorator([permissions.IsAuthenticated])
 def get_sku_structure(request):
     """
-    Endpoint para obtener la estructura de SKU y los componentes existentes.
+    Endpoint para obtener la estructura de SKU y los componentes existentes desde la base de datos.
+    Útil para construir selectores en cascada en el frontend.
     """
-    # Esta función ahora podría ser un endpoint de API que serialice los modelos
-    # para mostrar las opciones disponibles en el frontend.
-    data = SKUValidator.get_sku_structure_info()
-    return Response(data)
+    # Obtener categorías
+    categorias = []
+    for categoria in SkuCategory.objects.all():
+        categorias.append({
+            'id': categoria.id,
+            'code': categoria.code,
+            'name': categoria.name
+        })
+    
+    # Obtener subcategorías
+    subcategorias = []
+    for subcategoria in SkuSubCategory.objects.select_related('category').all():
+        subcategorias.append({
+            'id': subcategoria.id,
+            'code': subcategoria.code,
+            'name': subcategoria.name,
+            'category_id': subcategoria.category.id
+        })
+    
+    # Obtener tipos
+    tipos = []
+    for tipo in SkuType.objects.select_related('subcategory').all():
+        tipos.append({
+            'id': tipo.id,
+            'code': tipo.code,
+            'name': tipo.name,
+            'subcategory_id': tipo.subcategory.id
+        })
+    
+    return Response({
+        'categorias': categorias,
+        'subcategorias': subcategorias,
+        'tipos': tipos
+    })
 
 
+@swagger_auto_schema(
+    method='post',
+    operation_summary="Generar SKU automáticamente",
+    operation_description="Genera automáticamente el siguiente SKU disponible basado en los componentes seleccionados de la base de datos.",
+    request_body=openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['category_id', 'subcategory_id', 'type_id'],
+        properties={
+            'category_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la categoría de SKU", example=1),
+            'subcategory_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID de la subcategoría de SKU", example=1),
+            'type_id': openapi.Schema(type=openapi.TYPE_INTEGER, description="ID del tipo de SKU", example=1)
+        },
+        example={
+            "category_id": 1,
+            "subcategory_id": 1,
+            "type_id": 1
+        }
+    ),
+    responses={
+        200: openapi.Response(
+            description="SKU generado exitosamente",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'sku_sugerido': openapi.Schema(type=openapi.TYPE_STRING, description="SKU generado"),
+                    'categoria_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre de la categoría"),
+                    'subcategoria_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre de la subcategoría"),
+                    'tipo_nombre': openapi.Schema(type=openapi.TYPE_STRING, description="Nombre del tipo")
+                }
+            )
+        ),
+        400: "Bad Request"
+    }
+)
 @api_view(['POST'])
 @perm_decorator([permissions.IsAuthenticated])
 def generate_sku(request):
     """
     Endpoint para generar automáticamente el siguiente SKU disponible.
-    Recibe categoría, subcategoría y tipo, y devuelve el siguiente número secuencial.
+    Recibe IDs de categoría, subcategoría y tipo desde la base de datos.
     """
-    categoria = request.data.get('categoria', '').upper()
-    subcategoria = request.data.get('subcategoria', '').upper()
-    tipo = request.data.get('tipo', '').upper()
+    category_id = request.data.get('category_id')
+    subcategory_id = request.data.get('subcategory_id')
+    type_id = request.data.get('type_id')
     
-    if not all([categoria, subcategoria, tipo]):
+    if not all([category_id, subcategory_id, type_id]):
         return Response(
-            {'error': 'Se requieren categoria, subcategoria y tipo'},
+            {'error': 'Se requieren category_id, subcategory_id y type_id'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
     try:
+        # Obtener los objetos de la base de datos
+        sku_category = SkuCategory.objects.get(id=category_id)
+        sku_subcategory = SkuSubCategory.objects.get(id=subcategory_id, category=sku_category)
+        sku_type = SkuType.objects.get(id=type_id, subcategory=sku_subcategory)
+        
+        # Construir la base del SKU con los códigos
+        base_sku = f"{sku_category.code}-{sku_subcategory.code}-{sku_type.code}"
+        
         # Obtener todos los SKUs existentes para buscar el siguiente disponible
         existing_skus = list(Product.objects.values_list('sku', flat=True))
         
         sku_sugerido = SKUValidator.generate_next_sku(
-            categoria=categoria,
-            subcategoria=subcategoria, 
-            tipo=tipo,
+            base_sku=base_sku,
             existing_skus=existing_skus
         )
         
         return Response({
             'sku_sugerido': sku_sugerido,
-            'categoria_nombre': SKUValidator.CATEGORIAS.get(categoria, categoria),
-            'subcategoria_nombre': SKUValidator.SUBCATEGORIAS.get(categoria, {}).get(subcategoria, subcategoria),
-            'tipo_nombre': SKUValidator.TIPOS_MATERIALES.get(tipo, tipo)
+            'categoria_nombre': sku_category.name,
+            'subcategoria_nombre': sku_subcategory.name,
+            'tipo_nombre': sku_type.name
         })
         
-    except ValueError as e:
+    except SkuCategory.DoesNotExist:
+        return Response(
+            {'error': f'La categoría con ID {category_id} no existe'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except SkuSubCategory.DoesNotExist:
+        return Response(
+            {'error': f'La subcategoría con ID {subcategory_id} no existe o no pertenece a la categoría especificada'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except SkuType.DoesNotExist:
+        return Response(
+            {'error': f'El tipo con ID {type_id} no existe o no pertenece a la subcategoría especificada'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
         return Response(
             {'error': str(e)},
             status=status.HTTP_400_BAD_REQUEST
