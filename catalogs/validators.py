@@ -7,23 +7,26 @@ class SKUValidator:
     Formato: [CATEGORIA]-[SUBCATEGORIA]-[TIPO]-[SECUENCIAL]
     Ejemplo: LAB-ART-BIO-001
     Ahora valida contra los modelos de la base de datos.
+    Acepta tanto 3 como 4 dígitos en el secuencial por compatibilidad con datos legacy.
     """
     
     def __call__(self, value):
         """
         Valida que el SKU siga el formato correcto y que sus componentes existan en la BD.
+        Acepta secuenciales de 3 o 4 dígitos por compatibilidad.
         """
         from .models import SkuCategory, SkuSubCategory, SkuType
 
         if not value:
             raise ValidationError("El SKU es obligatorio.")
         
-        pattern = r'^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-\d{3}$'
+        # Patrón actualizado para aceptar 3 o 4 dígitos en el secuencial
+        pattern = r'^[A-Z0-9]{3}-[A-Z0-9]{3}-[A-Z0-9]{3}-\d{3,4}$'
         
         if not re.match(pattern, value):
             raise ValidationError(
                 "El SKU debe seguir el formato: CATEGORIA-SUBCATEGORIA-TIPO-SECUENCIAL "
-                "(ej: LAB-ART-BIO-001)."
+                "(ej: LAB-ART-BIO-001 o LAB-ART-BIO-1001)."
             )
         
         # Dividir el SKU en partes
@@ -58,11 +61,14 @@ class SKUValidator:
     def generate_next_sku(cls, base_sku, existing_skus=[]):
         """
         Genera el siguiente SKU secuencial para una base dada.
+        SOLO considera SKUs de 3 dígitos para el cálculo del consecutivo.
+        Los SKUs de 4 dígitos se ignoran por ser datos legacy incorrectos.
         Ej: base_sku='LAB-ART-BIO', existing_skus={'LAB-ART-BIO-001'}
         """
         from catalogs.models import Product
+        import re
         
-        # Encontrar el secuencial más alto para esta base de SKU
+        # Encontrar el secuencial más alto SOLO de SKUs con 3 dígitos
         highest_seq = 0
         
         # Buscar en la base de datos SKUs que coincidan exactamente con el patrón
@@ -71,14 +77,20 @@ class SKUValidator:
         relevant_skus = Product.objects.filter(sku__startswith=pattern).values_list('sku', flat=True)
         all_relevant_skus = set(relevant_skus) | set(existing_skus)
 
+        # Patrón para validar SKUs de exactamente 3 dígitos
+        three_digit_pattern = re.compile(r'^' + re.escape(base_sku) + r'-\d{3}$')
+
         for sku in all_relevant_skus:
             try:
-                # Verificar que el SKU tiene exactamente el formato esperado
+                # Verificar que el SKU tiene exactamente el formato esperado Y tiene 3 dígitos
                 parts = sku.split('-')
-                if len(parts) == 4 and sku.startswith(pattern):
-                    seq = int(parts[-1])  # Último elemento debería ser el número secuencial
-                    if seq > highest_seq:
-                        highest_seq = seq
+                if len(parts) == 4 and sku.startswith(pattern) and three_digit_pattern.match(sku):
+                    seq_str = parts[-1]  # Último elemento debería ser el número secuencial
+                    # Solo procesar si es exactamente de 3 dígitos
+                    if len(seq_str) == 3:
+                        seq = int(seq_str)
+                        if seq > highest_seq:
+                            highest_seq = seq
             except (ValueError, IndexError):
                 continue
         
