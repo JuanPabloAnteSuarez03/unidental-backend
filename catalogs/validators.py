@@ -63,17 +63,22 @@ class SKUValidator:
         from catalogs.models import Product
         
         # Encontrar el secuencial más alto para esta base de SKU
-        # Primero, buscar en la base de datos
         highest_seq = 0
         
-        relevant_skus = Product.objects.filter(sku__startswith=base_sku).values_list('sku', flat=True)
-        all_relevant_skus = set(relevant_skus) | set(existing_skus) # Combinar con los SKUs en memoria
+        # Buscar en la base de datos SKUs que coincidan exactamente con el patrón
+        # Usar un filtro más específico para evitar coincidencias parciales
+        pattern = f"{base_sku}-"
+        relevant_skus = Product.objects.filter(sku__startswith=pattern).values_list('sku', flat=True)
+        all_relevant_skus = set(relevant_skus) | set(existing_skus)
 
         for sku in all_relevant_skus:
             try:
-                seq = int(sku.split('-')[-1])
-                if seq > highest_seq:
-                    highest_seq = seq
+                # Verificar que el SKU tiene exactamente el formato esperado
+                parts = sku.split('-')
+                if len(parts) == 4 and sku.startswith(pattern):
+                    seq = int(parts[-1])  # Último elemento debería ser el número secuencial
+                    if seq > highest_seq:
+                        highest_seq = seq
             except (ValueError, IndexError):
                 continue
         
