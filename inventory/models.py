@@ -192,6 +192,11 @@ class InventoryMovement(models.Model):
         related_name="inventory_movements"
     )
     notes = models.TextField(blank=True, default='', verbose_name="Notas")
+    is_conversion = models.BooleanField(
+        default=False,
+        verbose_name="Es Conversión Manual",
+        help_text="Marcar si este movimiento es resultado de una conversión manual entre productos."
+    )
     
     # Campos para productos compuestos
     related_composite_movement = models.ForeignKey(
