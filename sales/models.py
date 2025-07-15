@@ -33,8 +33,8 @@ class Sale(models.Model):
     """Modelo para gestionar las ventas y sus detalles principales."""
     
     SALE_TYPE_CHOICES = [
-        ('normal', 'Normal'),
-        ('mayorista', 'Mayorista'),
+        ('normal', 'Efectivo'),
+        ('card', 'Tarjeta'),
         ('credit', 'Crédito'),
     ]
 
