@@ -464,12 +464,16 @@ class ProductConversion(models.Model):
         return conversions.all()
 
     @classmethod
-    def get_reverse_conversions(cls, to_product, location=None):
+    def get_reverse_conversions(cls, to_product, location=None, allow_non_reversible=False):
         """
         Obtiene las conversiones que pueden generar el producto especificado.
         Útil para saber qué productos puedes "abrir" para conseguir más stock.
+        Si allow_non_reversible=True, ignora el filtro is_reversible.
         """
-        conversions = cls.objects.filter(to_product=to_product, is_reversible=True)
+        if allow_non_reversible:
+            conversions = cls.objects.filter(to_product=to_product)
+        else:
+            conversions = cls.objects.filter(to_product=to_product, is_reversible=True)
         
         if location:
             # Solo mostrar conversiones donde haya stock del producto origen
