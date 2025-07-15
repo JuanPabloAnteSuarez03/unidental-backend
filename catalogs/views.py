@@ -1077,29 +1077,18 @@ def execute_conversion(request):
 def suggest_conversions(request):
     """
     Sugiere conversiones disponibles cuando no hay suficiente stock de un producto.
-    
-    Ejemplo de request:
-    {
-        "product_id": 1,
-        "location_id": 1,
-        "required_quantity": 10
-    }
     """
     serializer = ConversionSuggestionSerializer(data=request.data)
-    
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
     try:
         product = Product.objects.get(id=serializer.validated_data['product_id'])
         from inventory.models import Location, InventoryStock
         location = Location.objects.get(id=serializer.validated_data['location_id'])
         required_quantity = serializer.validated_data['required_quantity']
-        
         # Obtener stock actual
         current_stock = InventoryStock.get_total_stock(product, location)
         deficit = max(0, required_quantity - current_stock)
-        
         if deficit == 0:
             return Response({
                 'current_stock': current_stock,
@@ -1108,17 +1097,14 @@ def suggest_conversions(request):
                 'suggestions': [],
                 'message': 'Hay suficiente stock disponible'
             })
-        
-        # Buscar conversiones que puedan generar este producto
-        reverse_conversions = ProductConversion.get_reverse_conversions(product, location)
-        
+        # Buscar conversiones que puedan generar este producto (permitir no reversibles)
+        reverse_conversions = ProductConversion.get_reverse_conversions(product, location, allow_non_reversible=True)
         suggestions = []
         for conversion in reverse_conversions:
             available_stock = InventoryStock.get_total_stock(conversion.from_product, location)
             if available_stock > 0:
                 can_provide = available_stock * conversion.conversion_rate
                 units_needed = max(1, (deficit + conversion.conversion_rate - 1) // conversion.conversion_rate)
-                
                 suggestions.append({
                     'conversion': ProductConversionSerializer(conversion).data,
                     'available_stock': available_stock,
@@ -1126,17 +1112,14 @@ def suggest_conversions(request):
                     'units_needed': units_needed,
                     'would_convert_to': min(units_needed * conversion.conversion_rate, deficit)
                 })
-        
         # Ordenar por cantidad que pueden proveer (descendente)
         suggestions.sort(key=lambda x: x['can_provide'], reverse=True)
-        
         return Response({
             'current_stock': current_stock,
             'required_quantity': required_quantity,
             'deficit': deficit,
             'suggestions': suggestions
         })
-        
     except (Product.DoesNotExist, Location.DoesNotExist) as e:
         return Response(
             {'error': str(e)}, 
