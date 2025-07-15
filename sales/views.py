@@ -301,6 +301,240 @@ class ReturnViewSet(viewsets.ModelViewSet):
 
     @swagger_auto_schema(
         method='get',
+        operation_summary="Productos ya devueltos de una venta",
+        operation_description="Obtiene información detallada sobre los productos ya devueltos de una venta específica.",
+        manual_parameters=[
+            openapi.Parameter(
+                'sale_id', openapi.IN_QUERY,
+                description="ID de la venta para consultar productos devueltos",
+                type=openapi.TYPE_INTEGER,
+                required=True
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Información de productos devueltos obtenida exitosamente",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'sale_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'sale_date': openapi.Schema(type=openapi.TYPE_STRING),
+                        'customer_name': openapi.Schema(type=openapi.TYPE_STRING),
+                        'total_returned_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+                        'returned_items': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    'sale_item_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'product_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'product_name': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'product_sku': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'original_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'total_returned': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'remaining_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'returns_detail': openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(
+                                            type=openapi.TYPE_OBJECT,
+                                            properties={
+                                                'return_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                                'return_date': openapi.Schema(type=openapi.TYPE_STRING),
+                                                'quantity_returned': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                                'reason': openapi.Schema(type=openapi.TYPE_STRING),
+                                                'notes': openapi.Schema(type=openapi.TYPE_STRING),
+                                            }
+                                        )
+                                    )
+                                }
+                            )
+                        )
+                    }
+                )
+            ),
+            404: "Venta no encontrada"
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def returned_items_by_sale(self, request):
+        """
+        Obtiene información detallada sobre los productos ya devueltos de una venta específica.
+        
+        Parámetros de consulta:
+        - sale_id: ID de la venta para consultar productos devueltos
+        """
+        sale_id = request.query_params.get('sale_id')
+        if not sale_id:
+            return Response(
+                {'error': 'El parámetro sale_id es requerido'}, 
+                status=400
+            )
+        
+        try:
+            sale = Sale.objects.get(id=sale_id)
+        except Sale.DoesNotExist:
+            return Response(
+                {'error': f'Venta con ID {sale_id} no encontrada'}, 
+                status=404
+            )
+        
+        # Obtener todos los items de la venta con información de devoluciones
+        sale_items = SaleItem.objects.filter(sale=sale).select_related('product')
+        
+        returned_items_data = []
+        total_returned_amount = 0
+        
+        for sale_item in sale_items:
+            # Obtener todas las devoluciones de este item
+            return_items = ReturnItem.objects.filter(
+                sale_item=sale_item
+            ).select_related('return_obj').order_by('return_obj__return_date')
+            
+            total_returned = sum(item.quantity_returned for item in return_items)
+            remaining_quantity = sale_item.quantity - total_returned
+            
+            # Detalles de cada devolución
+            returns_detail = []
+            for return_item in return_items:
+                returns_detail.append({
+                    'return_id': return_item.return_obj.id,
+                    'return_date': return_item.return_obj.return_date.isoformat(),
+                    'quantity_returned': return_item.quantity_returned,
+                    'reason': return_item.return_obj.reason,
+                    'notes': return_item.return_obj.notes or '',
+                })
+            
+            if total_returned > 0:  # Solo incluir items que han sido devueltos
+                item_data = {
+                    'sale_item_id': sale_item.id,
+                    'product_id': sale_item.product.id,
+                    'product_name': sale_item.product.name,
+                    'product_sku': sale_item.product.sku,
+                    'original_quantity': sale_item.quantity,
+                    'total_returned': total_returned,
+                    'remaining_quantity': remaining_quantity,
+                    'returns_detail': returns_detail,
+                }
+                returned_items_data.append(item_data)
+                total_returned_amount += total_returned * sale_item.unit_price
+        
+        response_data = {
+            'sale_id': sale.id,
+            'sale_date': sale.sale_date.isoformat(),
+            'customer_name': sale.customer.name if sale.customer else 'N/A',
+            'total_returned_amount': total_returned_amount,
+            'returned_items': returned_items_data,
+        }
+        
+        return Response(response_data)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Resumen de productos devueltos",
+        operation_description="Obtiene un resumen de todos los productos devueltos en un período específico.",
+        manual_parameters=[
+            openapi.Parameter(
+                'days', openapi.IN_QUERY,
+                description="Número de días hacia atrás para calcular estadísticas",
+                type=openapi.TYPE_INTEGER,
+                default=30
+            ),
+            openapi.Parameter(
+                'limit', openapi.IN_QUERY,
+                description="Número máximo de productos a retornar",
+                type=openapi.TYPE_INTEGER,
+                default=20
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Resumen de productos devueltos obtenido exitosamente",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'period_days': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'total_returns': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'total_returned_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'total_returned_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+                        'top_returned_products': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    'product_id': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'product_name': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'product_sku': openapi.Schema(type=openapi.TYPE_STRING),
+                                    'total_returned_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                    'total_returned_amount': openapi.Schema(type=openapi.TYPE_NUMBER),
+                                    'return_count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                }
+                            )
+                        )
+                    }
+                )
+            )
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def returned_products_summary(self, request):
+        """
+        Obtiene un resumen de todos los productos devueltos en un período específico.
+        
+        Parámetros de consulta:
+        - days: Número de días hacia atrás para calcular estadísticas (default: 30)
+        - limit: Número máximo de productos a retornar (default: 20)
+        """
+        days = int(request.query_params.get('days', 30))
+        limit = int(request.query_params.get('limit', 20))
+        start_date = timezone.now() - timedelta(days=days)
+        
+        # Obtener todas las devoluciones en el período
+        returns = Return.objects.filter(return_date__gte=start_date)
+        
+        # Calcular estadísticas generales
+        total_returns = returns.count()
+        total_returned_amount = returns.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        
+        # Obtener productos más devueltos
+        top_returned_products = ReturnItem.objects.filter(
+            return_obj__return_date__gte=start_date
+        ).values(
+            'product__id',
+            'product__name',
+            'product__sku'
+        ).annotate(
+            total_returned_quantity=Sum('quantity_returned'),
+            total_returned_amount=Sum(F('quantity_returned') * F('unit_price')),
+            return_count=Count('return_obj', distinct=True)
+        ).order_by('-total_returned_quantity')[:limit]
+        
+        # Reformatear datos
+        formatted_products = []
+        total_returned_quantity = 0
+        
+        for product_data in top_returned_products:
+            formatted_products.append({
+                'product_id': product_data['product__id'],
+                'product_name': product_data['product__name'],
+                'product_sku': product_data['product__sku'],
+                'total_returned_quantity': product_data['total_returned_quantity'],
+                'total_returned_amount': product_data['total_returned_amount'] or 0,
+                'return_count': product_data['return_count'],
+            })
+            total_returned_quantity += product_data['total_returned_quantity']
+        
+        response_data = {
+            'period_days': days,
+            'total_returns': total_returns,
+            'total_returned_quantity': total_returned_quantity,
+            'total_returned_amount': total_returned_amount,
+            'top_returned_products': formatted_products,
+        }
+        
+        return Response(response_data)
+
+    @swagger_auto_schema(
+        method='get',
         operation_summary="Estadísticas de devoluciones por sede",
         operation_description="Obtiene estadísticas de devoluciones agrupadas por sede/ubicación.",
         manual_parameters=[
