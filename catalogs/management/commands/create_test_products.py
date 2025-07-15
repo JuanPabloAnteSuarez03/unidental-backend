@@ -9,7 +9,7 @@ from django.db import models
 
 
 class Command(BaseCommand):
-    help = 'Crea productos de prueba con lotes y componentes para testing'
+    help = 'Crea productos de prueba con lotes y componentes para testing usando ubicaciones existentes'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -78,16 +78,11 @@ class Command(BaseCommand):
         category_count = Category.objects.filter(name__startswith='Test ').count()
         Category.objects.filter(name__startswith='Test ').delete()
         
-        # Eliminar ubicaciones de prueba sin ventas ni devoluciones vinculadas
-        test_locations = Location.objects.filter(name__startswith='Test ')
-        used_locations = test_locations.filter(models.Q(sales__isnull=False) | models.Q(returns__isnull=False)).distinct()
-        safe_locations = test_locations.exclude(id__in=used_locations.values_list('id', flat=True))
-        location_count = safe_locations.count()
-        safe_locations.delete()
+        # Las ubicaciones existentes NO se eliminan, solo se reutilizan
         
         self.stdout.write(
             f'Eliminados: {product_count} productos, {category_count} categorías, '
-            f'{location_count} ubicaciones, {stock_count} stock, {movement_count} movimientos, '
+            f'{stock_count} stock, {movement_count} movimientos, '
             f'{sale_item_count} sale_items, {return_item_count} return_items, {batch_count} lotes, '
             f'{component_link_count} enlaces de componentes'
         )
@@ -96,7 +91,7 @@ class Command(BaseCommand):
         """Crea productos de prueba con diferentes configuraciones."""
         self.stdout.write('Creando productos de prueba...')
         
-        # 1. Crear ubicaciones de prueba
+        # 1. Usar ubicaciones existentes
         locations = self.create_test_locations()
         
         # 2. Crear categorías de prueba
@@ -129,39 +124,25 @@ class Command(BaseCommand):
         self.create_initial_stock(all_products, locations)
 
     def create_test_locations(self):
-        """Crea ubicaciones de prueba."""
-        self.stdout.write('Creando ubicaciones de prueba...')
+        """Usa ubicaciones existentes en lugar de crear nuevas."""
+        self.stdout.write('Usando ubicaciones existentes...')
         
-        locations_data = [
-            {
-                'name': 'Test Bodega Central',
-                'type': 'bodega',
-                'address': 'Av. Central 123 - UBICACIÓN DE PRUEBA'
-            },
-            {
-                'name': 'Test Sede Norte',
-                'type': 'sede',
-                'address': 'Calle Norte 456 - UBICACIÓN DE PRUEBA'
-            },
-            {
-                'name': 'Test Sede Sur',
-                'type': 'sede',
-                'address': 'Av. Sur 789 - UBICACIÓN DE PRUEBA'
-            }
-        ]
+        # Obtener todas las ubicaciones existentes
+        locations = list(Location.objects.all())
         
-        locations = []
-        for loc_data in locations_data:
-            location, created = Location.objects.get_or_create(
-                name=loc_data['name'],
-                defaults={
-                    'type': loc_data['type'],
-                    'address': loc_data['address']
-                }
+        if not locations:
+            self.stdout.write(
+                self.style.WARNING(
+                    '⚠️  No hay ubicaciones en la base de datos. '
+                    'Crea al menos una ubicación antes de ejecutar este comando.'
+                )
             )
-            if created:
-                self.stdout.write(f'  ✓ Ubicación creada: {loc_data["name"]}')
-            locations.append(location)
+            raise CommandError('No se encontraron ubicaciones en la base de datos.')
+        
+        # Mostrar las ubicaciones que se van a usar
+        self.stdout.write(f'  📍 Se usarán {len(locations)} ubicaciones existentes:')
+        for location in locations:
+            self.stdout.write(f'    - {location.name} ({location.type})')
         
         return locations
 
