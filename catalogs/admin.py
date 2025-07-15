@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Category, Product, ProductComponent, ProductBatch
+from .models import Category, Product, ProductComponent, ProductBatch, ProductConversion
 
 
 @admin.register(Category)
@@ -88,3 +88,33 @@ class ProductBatchAdmin(admin.ModelAdmin):
         else:
             return f"{days} días"
     days_to_expiry_display.short_description = "Días hasta vencimiento"
+
+
+@admin.register(ProductConversion)
+class ProductConversionAdmin(admin.ModelAdmin):
+    list_display = ['from_product', 'to_product', 'conversion_rate', 'is_reversible', 'created_at']
+    list_filter = ['is_reversible', 'created_at', 'from_product__category', 'to_product__category']
+    search_fields = [
+        'from_product__name', 'from_product__sku', 
+        'to_product__name', 'to_product__sku'
+    ]
+    ordering = ['from_product__name', 'to_product__name']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Información de Conversión', {
+            'fields': ('from_product', 'to_product', 'conversion_rate', 'is_reversible')
+        }),
+        ('Metadatos', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('from_product', 'to_product')
+    
+    def save_model(self, request, obj, form, change):
+        """Validar automáticamente al guardar."""
+        obj.full_clean()
+        super().save_model(request, obj, form, change)

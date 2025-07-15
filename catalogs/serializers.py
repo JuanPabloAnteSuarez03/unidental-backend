@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from .models import Category, Product, ProductComponent, ProductBatch, SkuCategory, SkuSubCategory, SkuType
+from .models import Category, Product, ProductComponent, ProductBatch, ProductConversion, SkuCategory, SkuSubCategory, SkuType
 
 
 # --- Serializadores para la estructura del SKU ---
@@ -162,4 +162,124 @@ class ProductSummarySerializer(serializers.ModelSerializer):
             'id', 'sku', 'barcode', 'name', 'description', 'unit', 'category', 'category_name', 
             'product_type', 'product_type_display', 'requires_batch_control',
             'min_stock_threshold', 'min_expiry_days_threshold', 'sale_price'
-        ] 
+        ]
+
+
+class ProductConversionSerializer(serializers.ModelSerializer):
+    """Serializador para conversiones de productos."""
+    
+    from_product_name = serializers.CharField(source='from_product.name', read_only=True)
+    from_product_sku = serializers.CharField(source='from_product.sku', read_only=True)
+    to_product_name = serializers.CharField(source='to_product.name', read_only=True)
+    to_product_sku = serializers.CharField(source='to_product.sku', read_only=True)
+    
+    class Meta:
+        model = ProductConversion
+        fields = [
+            'id', 'from_product', 'from_product_name', 'from_product_sku',
+            'to_product', 'to_product_name', 'to_product_sku',
+            'conversion_rate', 'is_reversible', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ('created_at', 'updated_at')
+
+
+class ConversionExecutionSerializer(serializers.Serializer):
+    """Serializer para ejecutar conversiones manuales."""
+    
+    conversion_id = serializers.IntegerField()
+    quantity_to_convert = serializers.IntegerField(min_value=1)
+    location_id = serializers.IntegerField()
+    batch_id = serializers.IntegerField(required=False, allow_null=True)
+    notes = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    
+    def validate_conversion_id(self, value):
+        """Validar que la conversión existe."""
+        try:
+            ProductConversion.objects.get(id=value)
+        except ProductConversion.DoesNotExist:
+            raise serializers.ValidationError("La conversión especificada no existe.")
+        return value
+    
+    def validate_location_id(self, value):
+        """Validar que la ubicación existe."""
+        from inventory.models import Location
+        try:
+            Location.objects.get(id=value)
+        except Location.DoesNotExist:
+            raise serializers.ValidationError("La ubicación especificada no existe.")
+        return value
+    
+    def validate_batch_id(self, value):
+        """Validar que el lote existe si se especifica."""
+        if value is not None:
+            try:
+                ProductBatch.objects.get(id=value)
+            except ProductBatch.DoesNotExist:
+                raise serializers.ValidationError("El lote especificado no existe.")
+        return value
+    
+    def validate(self, data):
+        """Validaciones a nivel de objeto."""
+        conversion = ProductConversion.objects.get(id=data['conversion_id'])
+        from inventory.models import Location
+        location = Location.objects.get(id=data['location_id'])
+        batch = None
+        
+        # Validar que se especifica lote si el producto lo requiere
+        if conversion.from_product.requires_batch_control and not data.get('batch_id'):
+            raise serializers.ValidationError({
+                'batch': ['Este producto requiere especificar un lote.']
+            })
+        
+        if data.get('batch_id'):
+            batch = ProductBatch.objects.get(id=data['batch_id'])
+            
+            # Validar que el lote pertenece al producto origen
+            if batch.product != conversion.from_product:
+                raise serializers.ValidationError({
+                    'batch_id': 'El lote especificado no pertenece al producto origen de la conversión.'
+                })
+        
+        # Validar que hay suficiente stock
+        from inventory.models import InventoryStock
+        if batch:
+            stock_record = InventoryStock.objects.filter(
+                product=conversion.from_product,
+                location=location,
+                batch=batch
+            ).first()
+            available = stock_record.quantity if stock_record else 0
+        else:
+            available = InventoryStock.get_total_stock(conversion.from_product, location)
+        
+        if available < data['quantity_to_convert']:
+            raise serializers.ValidationError({
+                'quantity_to_convert': f'Stock insuficiente. Disponible: {available}, Requerido: {data["quantity_to_convert"]}'
+            })
+        
+        return data
+
+
+class ConversionSuggestionSerializer(serializers.Serializer):
+    """Serializer para sugerencias de conversión cuando no hay stock suficiente."""
+    
+    product_id = serializers.IntegerField()
+    location_id = serializers.IntegerField()
+    required_quantity = serializers.IntegerField(min_value=1)
+    
+    def validate_product_id(self, value):
+        """Validar que el producto existe."""
+        try:
+            Product.objects.get(id=value)
+        except Product.DoesNotExist:
+            raise serializers.ValidationError("El producto especificado no existe.")
+        return value
+    
+    def validate_location_id(self, value):
+        """Validar que la ubicación existe."""
+        from inventory.models import Location
+        try:
+            Location.objects.get(id=value)
+        except Location.DoesNotExist:
+            raise serializers.ValidationError("La ubicación especificada no existe.")
+        return value 
