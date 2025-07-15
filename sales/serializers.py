@@ -251,7 +251,7 @@ class SaleSerializer(serializers.ModelSerializer):
                 
             try:
                 # Validar stock de cada producto independientemente
-                    self._validate_simple_stock(product, batch, quantity, location)
+                self._validate_simple_stock(product, batch, quantity, location)
             except InsufficientStockError as e:
                 validation_errors[f'items[{idx}]'] = e.detail
             except serializers.ValidationError as e:
