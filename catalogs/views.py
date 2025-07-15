@@ -5,12 +5,15 @@ from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Q, Count
 from datetime import timedelta
-from .models import Category, Product, ProductComponent, ProductBatch, SkuCategory, SkuSubCategory, SkuType
+from .models import Category, Product, ProductComponent, ProductBatch, ProductConversion, SkuCategory, SkuSubCategory, SkuType
 from .serializers import (
     CategorySerializer, 
     ProductSerializer, 
     ProductComponentSerializer, 
     ProductBatchSerializer,
+    ProductConversionSerializer,
+    ConversionExecutionSerializer,
+    ConversionSuggestionSerializer,
     SkuCategorySerializer,
     SkuSubCategorySerializer,
     SkuTypeSerializer
@@ -851,3 +854,291 @@ class ProductBatchViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class ProductConversionViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar conversiones de productos.
+    Permite crear, leer, actualizar y eliminar conversiones entre productos.
+    """
+    queryset = ProductConversion.objects.all()
+    serializer_class = ProductConversionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['from_product', 'to_product', 'is_reversible']
+    search_fields = ['from_product__name', 'to_product__name', 'from_product__sku', 'to_product__sku']
+    ordering_fields = ['from_product__name', 'to_product__name', 'conversion_rate', 'created_at']
+
+    @swagger_auto_schema(
+        method='get',
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de la ubicación", type=openapi.TYPE_INTEGER),
+        ],
+        responses={
+            200: ProductConversionSerializer(many=True),
+            400: 'Parámetros inválidos'
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='possible-from')
+    def possible_conversions_from(self, request):
+        """
+        Obtiene las conversiones posibles desde un producto específico.
+        Opcionalmente filtra por disponibilidad en una ubicación.
+        """
+        product_id = request.query_params.get('product')
+        location_id = request.query_params.get('location')
+        
+        if not product_id:
+            return Response(
+                {'error': 'Se requiere el parámetro product'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Producto no encontrado'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        location = None
+        if location_id:
+            try:
+                from inventory.models import Location
+                location = Location.objects.get(id=location_id)
+            except Location.DoesNotExist:
+                return Response(
+                    {'error': 'Ubicación no encontrada'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        conversions = ProductConversion.get_possible_conversions(product, location)
+        serializer = self.get_serializer(conversions, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        method='get',
+        manual_parameters=[
+            openapi.Parameter('product', openapi.IN_QUERY, description="ID del producto", type=openapi.TYPE_INTEGER),
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de la ubicación", type=openapi.TYPE_INTEGER),
+        ],
+        responses={
+            200: ProductConversionSerializer(many=True),
+            400: 'Parámetros inválidos'
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='possible-to')
+    def possible_conversions_to(self, request):
+        """
+        Obtiene las conversiones que pueden generar el producto especificado.
+        Útil para saber qué productos puedes "abrir" para conseguir más stock.
+        """
+        product_id = request.query_params.get('product')
+        location_id = request.query_params.get('location')
+        
+        if not product_id:
+            return Response(
+                {'error': 'Se requiere el parámetro product'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            product = Product.objects.get(id=product_id)
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Producto no encontrado'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        location = None
+        if location_id:
+            try:
+                from inventory.models import Location
+                location = Location.objects.get(id=location_id)
+            except Location.DoesNotExist:
+                return Response(
+                    {'error': 'Ubicación no encontrada'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        
+        conversions = ProductConversion.get_reverse_conversions(product, location)
+        serializer = self.get_serializer(conversions, many=True)
+        return Response(serializer.data)
+
+
+@swagger_auto_schema(
+    method='post',
+    request_body=ConversionExecutionSerializer,
+    responses={
+        200: openapi.Response(
+            description="Conversión ejecutada exitosamente",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'success': openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    'result': openapi.Schema(type=openapi.TYPE_OBJECT)
+                }
+            )
+        ),
+        400: 'Datos inválidos',
+        404: 'Conversión no encontrada'
+    }
+)
+@api_view(['POST'])
+@perm_decorator([IsAuthenticated])
+def execute_conversion(request):
+    """
+    Ejecuta una conversión manual de productos.
+    
+    Ejemplo de request:
+    {
+        "conversion_id": 1,
+        "quantity_to_convert": 2,
+        "location_id": 1,
+        "batch_id": 5,  // opcional
+        "notes": "Abriendo cajas para venta"  // opcional
+    }
+    """
+    serializer = ConversionExecutionSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        conversion = ProductConversion.objects.get(id=serializer.validated_data['conversion_id'])
+        from inventory.models import Location, ProductBatch
+        location = Location.objects.get(id=serializer.validated_data['location_id'])
+        
+        batch = None
+        if serializer.validated_data.get('batch_id'):
+            batch = ProductBatch.objects.get(id=serializer.validated_data['batch_id'])
+        
+        # Ejecutar la conversión
+        result = conversion.execute_conversion(
+            quantity_to_convert=serializer.validated_data['quantity_to_convert'],
+            location=location,
+            batch=batch,
+            user=request.user
+        )
+        
+        return Response({
+            'success': True,
+            'message': f'Conversión ejecutada: {result["converted_from"]["quantity"]} {result["converted_from"]["product"]} → {result["converted_to"]["quantity"]} {result["converted_to"]["product"]}',
+            'result': result
+        })
+        
+    except ProductConversion.DoesNotExist:
+        return Response(
+            {'error': 'Conversión no encontrada'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@swagger_auto_schema(
+    method='post',
+    request_body=ConversionSuggestionSerializer,
+    responses={
+        200: openapi.Response(
+            description="Sugerencias de conversión",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    'current_stock': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'required_quantity': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'deficit': openapi.Schema(type=openapi.TYPE_INTEGER),
+                    'suggestions': openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                'conversion': openapi.Schema(type=openapi.TYPE_OBJECT),
+                                'available_stock': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'can_provide': openapi.Schema(type=openapi.TYPE_INTEGER),
+                                'units_needed': openapi.Schema(type=openapi.TYPE_INTEGER)
+                            }
+                        )
+                    )
+                }
+            )
+        ),
+        400: 'Datos inválidos'
+    }
+)
+@api_view(['POST'])
+@perm_decorator([IsAuthenticated])
+def suggest_conversions(request):
+    """
+    Sugiere conversiones disponibles cuando no hay suficiente stock de un producto.
+    
+    Ejemplo de request:
+    {
+        "product_id": 1,
+        "location_id": 1,
+        "required_quantity": 10
+    }
+    """
+    serializer = ConversionSuggestionSerializer(data=request.data)
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        product = Product.objects.get(id=serializer.validated_data['product_id'])
+        from inventory.models import Location, InventoryStock
+        location = Location.objects.get(id=serializer.validated_data['location_id'])
+        required_quantity = serializer.validated_data['required_quantity']
+        
+        # Obtener stock actual
+        current_stock = InventoryStock.get_total_stock(product, location)
+        deficit = max(0, required_quantity - current_stock)
+        
+        if deficit == 0:
+            return Response({
+                'current_stock': current_stock,
+                'required_quantity': required_quantity,
+                'deficit': 0,
+                'suggestions': [],
+                'message': 'Hay suficiente stock disponible'
+            })
+        
+        # Buscar conversiones que puedan generar este producto
+        reverse_conversions = ProductConversion.get_reverse_conversions(product, location)
+        
+        suggestions = []
+        for conversion in reverse_conversions:
+            available_stock = InventoryStock.get_total_stock(conversion.from_product, location)
+            if available_stock > 0:
+                can_provide = available_stock * conversion.conversion_rate
+                units_needed = max(1, (deficit + conversion.conversion_rate - 1) // conversion.conversion_rate)
+                
+                suggestions.append({
+                    'conversion': ProductConversionSerializer(conversion).data,
+                    'available_stock': available_stock,
+                    'can_provide': can_provide,
+                    'units_needed': units_needed,
+                    'would_convert_to': min(units_needed * conversion.conversion_rate, deficit)
+                })
+        
+        # Ordenar por cantidad que pueden proveer (descendente)
+        suggestions.sort(key=lambda x: x['can_provide'], reverse=True)
+        
+        return Response({
+            'current_stock': current_stock,
+            'required_quantity': required_quantity,
+            'deficit': deficit,
+            'suggestions': suggestions
+        })
+        
+    except (Product.DoesNotExist, Location.DoesNotExist) as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_404_NOT_FOUND
+        )

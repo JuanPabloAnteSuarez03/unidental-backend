@@ -384,3 +384,210 @@ class ProductBatch(models.Model):
         from django.utils import timezone
         delta = self.expiry_date - timezone.now().date()
         return delta.days
+
+class ProductConversion(models.Model):
+    """
+    Modelo para definir conversiones manuales entre productos.
+    Ejemplo: 1 Caja = 5 Blisters, 1 Blister = 10 Pastillas
+    """
+    from_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='conversion_from',
+        verbose_name="Producto Origen",
+        help_text="Producto que se convierte (ej: Caja)"
+    )
+    to_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='conversion_to',
+        verbose_name="Producto Destino",
+        help_text="Producto resultante de la conversión (ej: Blisters)"
+    )
+    conversion_rate = models.PositiveIntegerField(
+        verbose_name="Factor de Conversión",
+        help_text="Cantidad del producto destino que se obtiene por cada unidad del producto origen"
+    )
+    is_reversible = models.BooleanField(
+        default=False,
+        verbose_name="¿Es Reversible?",
+        help_text="Si se puede hacer la conversión inversa (ej: 5 blisters → 1 caja)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Conversión de Producto"
+        verbose_name_plural = "Conversiones de Productos"
+        unique_together = ['from_product', 'to_product']
+        ordering = ['from_product__name', 'to_product__name']
+
+    def __str__(self):
+        return f"1 {self.from_product.name} → {self.conversion_rate} {self.to_product.name}"
+
+    def clean(self):
+        """Validaciones personalizadas."""
+        super().clean()
+        
+        if self.from_product == self.to_product:
+            raise ValidationError("Un producto no puede convertirse a sí mismo.")
+        
+        if self.conversion_rate <= 0:
+            raise ValidationError("El factor de conversión debe ser positivo.")
+        
+        # Validar que ambos productos manejen lotes de la misma manera
+        if self.from_product.requires_batch_control != self.to_product.requires_batch_control:
+            raise ValidationError(
+                "Los productos deben tener la misma configuración de control de lotes para permitir conversiones."
+            )
+
+    @classmethod
+    def get_possible_conversions(cls, from_product, location=None):
+        """
+        Obtiene las conversiones posibles desde un producto específico.
+        Opcionalmente filtra por disponibilidad en una ubicación.
+        """
+        conversions = cls.objects.filter(from_product=from_product)
+        
+        if location:
+            # Solo mostrar conversiones donde haya stock disponible
+            from inventory.models import InventoryStock
+            available_conversions = []
+            
+            for conversion in conversions:
+                stock = InventoryStock.get_total_stock(from_product, location)
+                if stock > 0:
+                    available_conversions.append(conversion)
+            
+            return available_conversions
+        
+        return conversions.all()
+
+    @classmethod
+    def get_reverse_conversions(cls, to_product, location=None):
+        """
+        Obtiene las conversiones que pueden generar el producto especificado.
+        Útil para saber qué productos puedes "abrir" para conseguir más stock.
+        """
+        conversions = cls.objects.filter(to_product=to_product, is_reversible=True)
+        
+        if location:
+            # Solo mostrar conversiones donde haya stock del producto origen
+            from inventory.models import InventoryStock
+            available_conversions = []
+            
+            for conversion in conversions:
+                stock = InventoryStock.get_total_stock(conversion.from_product, location)
+                if stock > 0:
+                    available_conversions.append(conversion)
+            
+            return available_conversions
+        
+        return conversions.all()
+
+    def execute_conversion(self, quantity_to_convert, location, batch=None, user=None):
+        """
+        Ejecuta la conversión de productos actualizando el inventario.
+        
+        Args:
+            quantity_to_convert: Cantidad del producto origen a convertir
+            location: Ubicación donde hacer la conversión
+            batch: Lote específico (si los productos requieren control de lotes)
+            user: Usuario que ejecuta la conversión
+        
+        Returns:
+            dict con el resultado de la conversión
+        """
+        from inventory.models import InventoryStock, InventoryMovement
+        from django.db import transaction
+        
+        # Validar que se especifica lote si el producto lo requiere
+        if self.from_product.requires_batch_control and not batch:
+            raise ValidationError("Este producto requiere especificar un lote.")
+        
+        # Validar que si se especifica lote, pertenece al producto origen
+        if batch and batch.product != self.from_product:
+            raise ValidationError("El lote especificado no pertenece al producto origen de la conversión.")
+        
+        # Validar que hay suficiente stock del producto origen
+        if batch:
+            origin_stock = InventoryStock.objects.filter(
+                product=self.from_product,
+                location=location,
+                batch=batch
+            ).first()
+            available_quantity = origin_stock.quantity if origin_stock else 0
+        else:
+            available_quantity = InventoryStock.get_total_stock(self.from_product, location)
+        
+        if available_quantity < quantity_to_convert:
+            raise ValidationError(
+                f"No hay suficiente stock. Disponible: {available_quantity}, Requerido: {quantity_to_convert}"
+            )
+        
+        total_converted = quantity_to_convert * self.conversion_rate
+        
+        with transaction.atomic():
+            # Reducir stock del producto origen
+            InventoryMovement.objects.create(
+                product=self.from_product,
+                location=location,
+                batch=batch,
+                movement_type='out',
+                quantity=quantity_to_convert,
+                notes=f"Conversión manual a {self.to_product.name}",
+                user=user,
+                is_conversion=True
+            )
+            
+            # Aumentar stock del producto destino
+            destination_batch = None
+            if self.to_product.requires_batch_control:
+                if batch:
+                    # Crear un lote para el producto destino basado en el lote del producto origen
+                    destination_batch, _ = ProductBatch.objects.get_or_create(
+                        product=self.to_product,
+                        batch_number=f"{batch.batch_number}-CONV",  # Agregar sufijo para diferenciarlo
+                        defaults={
+                            'expiry_date': batch.expiry_date,
+                            'manufacturing_date': batch.manufacturing_date,
+                            'supplier_reference': batch.supplier_reference,
+                            'notes': f"Lote creado por conversión desde {self.from_product.name}"
+                        }
+                    )
+                else:
+                    # Si el producto origen no tenía lote pero el destino lo requiere,
+                    # necesitamos crear un lote genérico
+                    from datetime import date, timedelta
+                    destination_batch, _ = ProductBatch.objects.get_or_create(
+                        product=self.to_product,
+                        batch_number=f"CONV-{self.to_product.sku}-{date.today().strftime('%Y%m%d')}",
+                        defaults={
+                            'expiry_date': date.today() + timedelta(days=365),  # 1 año por defecto
+                            'notes': f"Lote creado por conversión desde {self.from_product.name}"
+                        }
+                    )
+                
+            InventoryMovement.objects.create(
+                product=self.to_product,
+                location=location,
+                batch=destination_batch,
+                movement_type='in',
+                quantity=total_converted,
+                notes=f"Conversión manual desde {self.from_product.name}",
+                user=user,
+                is_conversion=True
+            )
+        
+        return {
+            'success': True,
+            'converted_from': {
+                'product': self.from_product.name,
+                'quantity': quantity_to_convert
+            },
+            'converted_to': {
+                'product': self.to_product.name,
+                'quantity': total_converted
+            },
+            'batch': batch.batch_number if batch else None
+        }

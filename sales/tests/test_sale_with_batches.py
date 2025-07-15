@@ -275,12 +275,12 @@ class TestSaleSerializerWithBatches:
         }
         
         serializer = SaleSerializer(data=sale_data)
-        assert serializer.is_valid(), serializer.errors
+        assert not serializer.is_valid(), "El serializer debería ser inválido por stock insuficiente"
         
-        with pytest.raises(DRFValidationError) as exc_info:
-            serializer.save()
-        
-        error_message = str(exc_info.value)
+        # Verificar que el mensaje de error es correcto
+        errors = serializer.errors
+        assert 'items[0]' in errors
+        error_message = str(errors['items[0]']['items'])
         assert "Stock insuficiente del lote LOT-2024-001" in error_message
         assert "Disponible: 50" in error_message
         assert "Solicitado: 60" in error_message
@@ -363,10 +363,11 @@ class TestSaleSerializerWithBatches:
         }
         
         serializer = SaleSerializer(data=sale_data)
-        assert serializer.is_valid(), serializer.errors
+        assert not serializer.is_valid(), "El serializer debería ser inválido porque no hay stock del lote"
         
-        with pytest.raises(DRFValidationError) as exc_info:
-            serializer.save()
-        
-        error_message = str(exc_info.value)
+        # Verificar que el mensaje de error es correcto
+        errors = serializer.errors
+        assert 'items[0]' in errors
+        error_message = str(errors['items[0]']['items'])
         assert "No hay stock del lote LOT-2024-003" in error_message 
+        assert "Amoxicilina 500mg" in error_message 
