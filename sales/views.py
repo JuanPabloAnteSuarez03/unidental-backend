@@ -12,6 +12,7 @@ from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.permissions import IsAuthenticated
+from .filters import SaleFilter
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -39,7 +40,7 @@ class SaleViewSet(viewsets.ModelViewSet):
     queryset = Sale.objects.select_related('customer', 'location').prefetch_related('items__product').all()
     serializer_class = SaleSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['sale_type', 'should_invoice', 'customer', 'location']
+    filterset_class = SaleFilter
     search_fields = ['customer__name', 'location__name']
     ordering_fields = ['sale_date', 'total_gross', 'total_net']
 
@@ -76,7 +77,7 @@ class SaleViewSet(viewsets.ModelViewSet):
     @action(detail=False)
     def today(self, request):
         """Retorna todas las ventas realizadas en el día actual."""
-        today = timezone.now().date()
+        today = timezone.localdate()
         sales = Sale.objects.filter(
             sale_date__date=today
         ).order_by('-sale_date')
