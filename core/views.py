@@ -6,7 +6,7 @@ from django.db import connection, DatabaseError
 from django.core.cache import cache
 
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 @permission_classes([AllowAny])
 def health_check_view(request):
     """
@@ -18,6 +18,10 @@ def health_check_view(request):
     
     Devuelve un estado 200 OK si todos los servicios están operativos,
     o un 503 Service Unavailable si alguno de los servicios críticos falla.
+    
+    Soporta métodos GET y HEAD:
+    - GET: Devuelve el estado completo de los servicios
+    - HEAD: Devuelve solo el código de estado HTTP sin cuerpo de respuesta
     """
     services_status = {
         'database': 'ok',
@@ -44,4 +48,9 @@ def health_check_view(request):
         services_status['cache'] = 'error'
         overall_status = status.HTTP_503_SERVICE_UNAVAILABLE
 
+    # Para HEAD requests, devolver solo el código de estado sin cuerpo
+    if request.method == 'HEAD':
+        return Response(status=overall_status)
+    
+    # Para GET requests, devolver el estado completo
     return Response(services_status, status=overall_status)
