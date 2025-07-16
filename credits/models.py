@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.utils import timezone
 from sales.models import Sale
 from datetime import date, timedelta
 from decimal import Decimal
@@ -30,7 +31,7 @@ class CreditAccount(models.Model):
         verbose_name="Monto pendiente"
     )
     start_date = models.DateField(
-        default=date.today,
+        default=timezone.localdate,
         verbose_name="Fecha de inicio"
     )
     due_date = models.DateField(
@@ -105,11 +106,11 @@ class CreditAccount(models.Model):
         """Verifica si el crédito está vencido."""
         # Si tiene cuotas, verificar por próxima fecha de pago
         if self.next_payment_date:
-            return date.today() > self.next_payment_date and not self.is_fully_paid
+            return timezone.localdate() > self.next_payment_date and not self.is_fully_paid
         # Si no tiene cuotas, verificar por fecha de vencimiento
         if not self.due_date:
             return False
-        return date.today() > self.due_date and not self.is_fully_paid
+        return timezone.localdate() > self.due_date and not self.is_fully_paid
 
     @property
     def total_paid(self):
@@ -209,7 +210,7 @@ class CreditPayment(models.Model):
         verbose_name="Monto pagado"
     )
     payment_date = models.DateField(
-        default=date.today,
+        default=timezone.localdate,
         verbose_name="Fecha de pago"
     )
     notes = models.TextField(
@@ -282,7 +283,7 @@ class CreditPurchaseAccount(models.Model):
         verbose_name="Monto pendiente"
     )
     start_date = models.DateField(
-        default=date.today,
+        default=timezone.localdate,
         verbose_name="Fecha de inicio"
     )
     payment_frequency = models.CharField(
