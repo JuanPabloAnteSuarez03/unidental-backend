@@ -7,6 +7,7 @@ from django.db.models import Sum, Q, Count, Case, When, DecimalField
 from django.utils import timezone
 from datetime import date, timedelta
 from drf_yasg.utils import swagger_auto_schema
+from .filters import CreditAccountFilter, CreditPaymentFilter
 from drf_yasg import openapi
 from urllib.parse import quote
 from django.shortcuts import render
@@ -65,7 +66,7 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
     queryset = CreditAccount.objects.all()
     serializer_class = CreditAccountSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['sale__customer']  # Solo campos del modelo
+    filterset_class = CreditAccountFilter
     search_fields = ['sale__customer__name', 'sale__customer__email', 'sale__customer__phone']
     ordering_fields = ['created_at', 'due_date', 'next_payment_date', 'remaining_amount', 'original_amount']
 
@@ -497,7 +498,7 @@ class CreditPaymentViewSet(viewsets.ModelViewSet):
     queryset = CreditPayment.objects.all()
     serializer_class = CreditPaymentSerializer
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    filterset_fields = ['credit_account', 'payment_date']
+    filterset_class = CreditPaymentFilter
     ordering_fields = ['payment_date', 'amount_paid', 'created_at']
 
     def get_queryset(self):
