@@ -12,7 +12,7 @@ from django.db.models import Sum, Count, F
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.permissions import IsAuthenticated
-from .filters import SaleFilter
+from .filters import SaleFilter, ReturnFilter
 
 
 class CustomerViewSet(viewsets.ModelViewSet):
@@ -217,7 +217,7 @@ class ReturnViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = ReturnSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['reason', 'original_sale', 'customer', 'location']
+    filterset_class = ReturnFilter
     search_fields = ['customer__name', 'original_sale__id', 'notes']
     ordering_fields = ['return_date', 'total_amount']
     ordering = ['-return_date']
@@ -293,7 +293,7 @@ class ReturnViewSet(viewsets.ModelViewSet):
     @action(detail=False)
     def today(self, request):
         """Retorna todas las devoluciones realizadas en el día actual."""
-        today = timezone.now().date()
+        today = timezone.localdate()
         returns = Return.objects.filter(
             return_date__date=today
         ).order_by('-return_date')
