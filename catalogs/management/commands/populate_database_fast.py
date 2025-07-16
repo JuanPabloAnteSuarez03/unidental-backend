@@ -489,10 +489,21 @@ class Command(BaseCommand):
                 Location.objects.all().delete()
                 CreditPayment.objects.all().delete()
                 CreditAccount.objects.all().delete()
+                
+                # Limpiar componentes SKU
+                SkuType.objects.all().delete()
+                SkuSubCategory.objects.all().delete()
+                SkuCategory.objects.all().delete()
             finally:
                 # Reconectar señales
                 post_delete.connect(update_inventory_on_return_item_delete, sender=ReturnItem)
                 post_delete.connect(update_return_total, sender=ReturnItem)
+        
+        # Limpiar caches después de la limpieza
+        self.sku_category_cache.clear()
+        self.sku_subcategory_cache.clear()
+        self.sku_type_cache.clear()
+        
         self.stdout.write("✅ Base de datos limpiada")
 
     def _preload_caches(self):
@@ -658,8 +669,19 @@ class Command(BaseCommand):
                             self._get_or_create_sku_components(cat_code, cat_name, sub_code, sub_name, type_code, type_name)
                             
                             base_sku = f"{cat_code}-{sub_code}-{type_code}"
-                            sku = self.validator.generate_next_sku(base_sku, existing_skus)
-                            existing_skus.add(sku)
+                            
+                            # Generar SKU único
+                            counter = 1
+                            while True:
+                                sku = f"{base_sku}-{counter:03d}"
+                                if sku not in existing_skus:
+                                    existing_skus.add(sku)
+                                    break
+                                counter += 1
+                                # Prevenir bucles infinitos
+                                if counter > 9999:
+                                    self.errors.append(f"Error: No se pudo generar SKU único para {product_name}")
+                                    break
                             
                             fecha_vencimiento = self._parse_date(row[9].strip())
                             requires_batch = fecha_vencimiento is not None
@@ -714,11 +736,30 @@ class Command(BaseCommand):
                 # Fase 2: Creación masiva
                 # Crear Productos
                 self.stdout.write("\n📦 Creando productos en masa...")
-                Product.objects.bulk_create(products_to_create, batch_size=500)
-                self.stats['products_created'] = len(products_to_create)
+                try:
+                    Product.objects.bulk_create(products_to_create, batch_size=500)
+                    self.stats['products_created'] = len(products_to_create)
+                except Exception as e:
+                    self.stdout.write(f"⚠️  Error en creación masiva: {e}")
+                    self.stdout.write("🔄 Intentando creación individual...")
+                    
+                    # Crear productos uno por uno para identificar el problema
+                    successful_products = []
+                    for product in products_to_create:
+                        try:
+                            product.save()
+                            successful_products.append(product)
+                            self.stats['products_created'] += 1
+                        except Exception as individual_error:
+                            self.errors.append(f"Error creando producto {product.sku}: {individual_error}")
+                    
+                    self.stdout.write(f"✅ {len(successful_products)} productos creados exitosamente")
+                    products_to_create = successful_products
                 
                 # Mapear productos creados por SKU para fácil acceso
-                product_map = {p.sku: p for p in Product.objects.all()}
+                # Usar solo los productos que se crearon exitosamente
+                successful_skus = {p.sku for p in products_to_create}
+                product_map = {p.sku: p for p in Product.objects.filter(sku__in=successful_skus)}
                 
                 # Preparar objetos relacionados
                 batches_to_create = []
