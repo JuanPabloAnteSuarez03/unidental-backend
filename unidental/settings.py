@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     'inventory',
     'purchases',
     'suppliers',
+    'cash',
 ]
 
 MIDDLEWARE = [
@@ -331,11 +332,11 @@ DJOSER = {
     'EMAIL': {
         'password_reset': 'core.email.PasswordResetEmail',
     },
-    # 'SERIALIZERS': {
-    #     'user_create': 'your_app.serializers.UserCreateSerializer', # Ejemplo para personalizar
-    #     'user': 'your_app.serializers.UserSerializer',
-    #     'current_user': 'your_app.serializers.UserSerializer',
-    # },
+    'SERIALIZERS': {
+        'user_create': 'core.serializers.UserCreateSerializer',
+        'user': 'core.serializers.UserSerializer',
+        'current_user': 'core.serializers.UserSerializer',
+    },
     # 'USER_ID_FIELD': 'id', # o el campo que uses como ID de usuario
     # 'LOGIN_FIELD': 'email', # o 'username'
 }
