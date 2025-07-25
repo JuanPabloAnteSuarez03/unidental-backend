@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.db.models import Q, F, Sum, Case, When
 from django.db import transaction
 
-from .models import PurchaseOrder, PurchaseOrderItem
+from .models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment
 from .serializers import (
     PurchaseOrderSerializer,
     PurchaseOrderDetailSerializer,
@@ -20,7 +20,8 @@ from .serializers import (
     PurchaseOrderItemCreateSerializer,
     PurchaseOrderItemForOrderCreateSerializer,
     ProductAlternativesSerializer,
-    AlternativeBrandSerializer
+    AlternativeBrandSerializer,
+    PurchaseOrderPaymentSerializer
 )
 from .filters import PurchaseOrderFilter, PurchaseOrderItemFilter
 from suppliers.models import PurchaseOption
@@ -487,3 +488,25 @@ class PurchaseOrderItemViewSet(viewsets.ModelViewSet):
         
         serializer = ProductAlternativesSerializer(result, many=True)
         return Response(serializer.data)
+
+
+class PurchaseOrderPaymentViewSet(viewsets.ModelViewSet):
+    queryset = PurchaseOrderPayment.objects.select_related('order', 'user', 'cash', 'annulled_by').all()
+    serializer_class = PurchaseOrderPaymentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['order', 'user', 'cash', 'is_annulled']
+    search_fields = ['notes', 'order__id', 'user__username']
+    ordering_fields = ['date', 'amount', 'order']
+    ordering = ['-date']
+
+    @action(detail=True, methods=['post'], url_path='annul')
+    def annul(self, request, pk=None):
+        payment = self.get_object()
+        if payment.is_annulled:
+            return Response({'detail': 'El pago ya está anulado.'}, status=400)
+        payment.is_annulled = True
+        payment.annulled_at = timezone.now()
+        payment.annulled_by = request.user
+        payment.save()
+        return Response({'detail': 'Pago anulado correctamente.'})

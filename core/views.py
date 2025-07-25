@@ -4,6 +4,14 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db import connection, DatabaseError
 from django.core.cache import cache
+from rest_framework import generics, status
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
+from django.contrib.auth.models import User
+from .serializers import UserCreateSerializer, UserSerializer
+from .permissions import IsAuthenticated
+from core.permissions import IsAdmin
+from .serializers import AdminUserCreateSerializer
 
 
 @api_view(['GET', 'HEAD'])
@@ -54,3 +62,51 @@ def health_check_view(request):
     
     # Para GET requests, devolver el estado completo
     return Response(services_status, status=overall_status)
+
+
+class UserCreateView(generics.CreateAPIView):
+    """
+    Vista para crear usuarios.
+    Solo permite crear usuarios con rol 'User' por defecto.
+    """
+    queryset = User.objects.all()
+    serializer_class = UserCreateSerializer
+    permission_classes = [AllowAny]  # Permitir registro público
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Retornar respuesta con información del usuario creado
+        user_serializer = UserSerializer(user)
+        return Response({
+            'message': 'Usuario creado exitosamente con rol User',
+            'user': user_serializer.data
+        }, status=status.HTTP_201_CREATED)
+
+
+class UserMeView(generics.RetrieveUpdateAPIView):
+    """
+    Vista para obtener y actualizar información del usuario actual.
+    """
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class AdminUserCreateView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = AdminUserCreateSerializer
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response({
+            'message': 'Usuario creado exitosamente',
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
