@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import PurchaseOrder, PurchaseOrderItem
+from .models import PurchaseOrder, PurchaseOrderItem, PurchaseOrderPayment
+from django.utils import timezone
 
 
 class PurchaseOrderItemInline(admin.TabularInline):
@@ -244,3 +245,22 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
         """Muestra el total de la línea formateado."""
         return f"${obj.line_total:,.2f}"
     line_total_display.short_description = "Total línea"
+
+
+@admin.register(PurchaseOrderPayment)
+class PurchaseOrderPaymentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order', 'amount', 'date', 'user', 'cash', 'is_annulled', 'annulled_at')
+    list_filter = ('is_annulled', 'cash', 'user', 'date')
+    search_fields = ('order__id', 'user__username', 'notes')
+    readonly_fields = ('date', 'annulled_at', 'annulled_by')
+    actions = ['annul_payments']
+
+    def annul_payments(self, request, queryset):
+        for payment in queryset:
+            if not payment.is_annulled:
+                payment.is_annulled = True
+                payment.annulled_at = timezone.now()
+                payment.annulled_by = request.user
+                payment.save()
+        self.message_user(request, "Pagos anulados correctamente.")
+    annul_payments.short_description = "Anular pagos seleccionados"

@@ -8,6 +8,7 @@ from inventory.serializers import LocationSerializer
 from django.db import models
 from django.db import transaction
 from decimal import Decimal
+from cash.models import Cashes, Movements
 
 
 class InsufficientStockError(APIException):
@@ -94,6 +95,7 @@ class SaleSerializer(serializers.ModelSerializer):
         Crea una venta con sus items asociados.
         Actualiza automáticamente el stock de los productos usando la sede especificada.
         Todos los productos se manejan como productos independientes.
+        Además, registra un movimiento de caja (ingreso) en la caja de la sede correspondiente.
         """
         items_data = validated_data.pop('items')
         sale = Sale.objects.create(**validated_data)
@@ -109,6 +111,21 @@ class SaleSerializer(serializers.ModelSerializer):
             
             # Crear el item de venta
             SaleItem.objects.create(sale=sale, **item_data)
+
+        # --- REGISTRO DE MOVIMIENTO DE CAJA ---
+        try:
+            cash = Cashes.objects.get(location=sale_location, is_active=True)
+            Movements.objects.create(
+                cash=cash,
+                movement_type='ingreso',
+                amount=sale.total_net,
+                reference_type='venta',
+                notes=f"Ingreso por venta #{sale.id}",
+                sale=sale,
+                created_by=getattr(self.context.get('request'), 'user', None)
+            )
+        except Cashes.DoesNotExist:
+            pass  # Si no hay caja activa para la sede, no se registra movimiento
 
         return sale
 

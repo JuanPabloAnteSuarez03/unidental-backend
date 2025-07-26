@@ -4,6 +4,31 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from suppliers.models import Supplier, PurchaseOption
 from inventory.models import Location
+from decimal import Decimal
+
+
+class PurchaseOrderPayment(models.Model):
+    order = models.ForeignKey('PurchaseOrder', on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=15, decimal_places=2)
+    date = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    cash = models.ForeignKey('cash.Cashes', on_delete=models.SET_NULL, null=True, blank=True)
+    is_annulled = models.BooleanField(default=False)
+    annulled_at = models.DateTimeField(null=True, blank=True)
+    annulled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='annulled_purchase_payments')
+
+    def clean(self):
+        # No permitir pagos mayores al saldo pendiente
+        if self.amount <= 0:
+            raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
+        if self.order and not self.is_annulled:
+            total_paid = self.order.get_total_paid(exclude_payment=self)
+            if total_paid + self.amount > self.order.get_total_amount():
+                raise ValidationError({'amount': 'No se puede pagar más del total de la orden.'})
+
+    def __str__(self):
+        return f"Pago de ${self.amount} para Orden #{self.order.id}"
 
 
 class PurchaseOrder(models.Model):
@@ -96,6 +121,29 @@ class PurchaseOrder(models.Model):
                     })
             except PurchaseOrder.DoesNotExist:
                 pass
+
+    @property
+    def payment_status(self):
+        total_paid = self.get_total_paid()
+        total_amount = self.get_total_amount()
+        if total_paid == 0:
+            return 'pendiente'
+        elif total_paid < total_amount:
+            return 'parcial'
+        else:
+            return 'pagada'
+
+    def get_total_paid(self, exclude_payment=None):
+        qs = self.payments.filter(is_annulled=False)
+        if exclude_payment:
+            qs = qs.exclude(pk=exclude_payment.pk)
+        return qs.aggregate(total=models.Sum('amount'))['total'] or Decimal('0.00')
+
+    def get_total_amount(self):
+        # Si tienes un campo total_amount, úsalo. Si no, calcula sumando los items.
+        if hasattr(self, 'total_amount') and self.total_amount:
+            return self.total_amount
+        return sum(item.line_total for item in self.items.all())
 
     @property
     def total_amount(self):
