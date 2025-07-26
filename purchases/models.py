@@ -13,7 +13,7 @@ class PurchaseOrderPayment(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     notes = models.TextField(blank=True, default='')
-    cash = models.ForeignKey('cash.Cash', on_delete=models.SET_NULL, null=True, blank=True)
+    cash = models.ForeignKey('cash.Cashes', on_delete=models.SET_NULL, null=True, blank=True)
     is_annulled = models.BooleanField(default=False)
     annulled_at = models.DateTimeField(null=True, blank=True)
     annulled_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='annulled_purchase_payments')

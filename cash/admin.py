@@ -2,10 +2,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils import timezone
-from .models import Cash, CashMovement, CashTransfer
+from .models import Cashes, Movements, Transfers
 
 
-@admin.register(Cash)
+@admin.register(Cashes)
 class CashAdmin(admin.ModelAdmin):
     list_display = [
         'location_name', 'location_type', 'balance_formatted', 
@@ -43,23 +43,26 @@ class CashAdmin(admin.ModelAdmin):
 
     def balance_formatted(self, obj):
         color = 'green' if obj.balance >= 0 else 'red'
+        formatted_amount = f"${obj.balance:,.2f}"
         return format_html(
-            '<span style="color: {};">${:,.2f}</span>',
-            color, obj.balance
+            '<span style="color: {};">{}</span>',
+            color, formatted_amount
         )
     balance_formatted.short_description = 'Saldo'
 
     def movements_count(self, obj):
         count = obj.movements.count()
         if count > 0:
-            url = reverse('admin:cash_cashmovement_changelist') + f'?cash__id__exact={obj.id}'
+            base_url = reverse('admin:cash_movements_changelist')
+            url = f'{base_url}?cash__id__exact={obj.id}'
             return format_html('<a href="{}">{} movimientos</a>', url, count)
         return '0 movimientos'
     movements_count.short_description = 'Movimientos'
 
     def movements_link(self, obj):
         if obj.pk:
-            url = reverse('admin:cash_cashmovement_changelist') + f'?cash__id__exact={obj.id}'
+            base_url = reverse('admin:cash_movements_changelist')
+            url = f'{base_url}?cash__id__exact={obj.id}'
             return format_html('<a href="{}" target="_blank">Ver movimientos de esta caja</a>', url)
         return 'Guarde primero para ver movimientos'
     movements_link.short_description = 'Movimientos'
@@ -67,9 +70,9 @@ class CashAdmin(admin.ModelAdmin):
     actions = ['recalculate_balance', 'activate_cash', 'deactivate_cash']
 
     def recalculate_balance(self, request, queryset):
-        for cash in queryset:
-            cash.update_balance()
-        self.message_user(request, f'Saldo recalculado para {queryset.count()} cajas.')
+        # El balance se calcula automáticamente en los movimientos
+        # No es necesario recalcular manualmente
+        self.message_user(request, f'El saldo se calcula automáticamente en {queryset.count()} cajas.')
     recalculate_balance.short_description = 'Recalcular saldo'
 
     def activate_cash(self, request, queryset):
@@ -83,7 +86,7 @@ class CashAdmin(admin.ModelAdmin):
     deactivate_cash.short_description = 'Desactivar cajas seleccionadas'
 
 
-@admin.register(CashMovement)
+@admin.register(Movements)
 class CashMovementAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'cash_location', 'movement_type', 'amount_formatted', 
@@ -126,11 +129,14 @@ class CashMovementAdmin(admin.ModelAdmin):
 
     def amount_formatted(self, obj):
         if obj.movement_type == 'egreso':
-            return format_html('<span style="color: red;">-${:,.2f}</span>', obj.amount)
+            formatted_amount = f"-${obj.amount:,.2f}"
+            return format_html('<span style="color: red;">{}</span>', formatted_amount)
         elif obj.movement_type == 'ingreso':
-            return format_html('<span style="color: green;">+${:,.2f}</span>', obj.amount)
+            formatted_amount = f"+${obj.amount:,.2f}"
+            return format_html('<span style="color: green;">{}</span>', formatted_amount)
         else:  # ajuste
-            return format_html('<span style="color: blue;">${:,.2f}</span>', obj.amount)
+            formatted_amount = f"${obj.amount:,.2f}"
+            return format_html('<span style="color: blue;">{}</span>', formatted_amount)
     amount_formatted.short_description = 'Monto'
 
     def related_sale_link(self, obj):
@@ -178,7 +184,7 @@ class CashMovementAdmin(admin.ModelAdmin):
     reactivate_movements.short_description = 'Reactivar movimientos seleccionados'
 
 
-@admin.register(CashTransfer)
+@admin.register(Transfers)
 class CashTransferAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'origin_location', 'destination_location', 'amount_formatted',
@@ -221,19 +227,20 @@ class CashTransferAdmin(admin.ModelAdmin):
     destination_location.short_description = 'Destino'
 
     def amount_formatted(self, obj):
-        return format_html('${:,.2f}', obj.amount)
+        formatted_amount = f"${obj.amount:,.2f}"
+        return format_html('{}', formatted_amount)
     amount_formatted.short_description = 'Monto'
 
     def origin_movement_link(self, obj):
         if obj.origin_movement:
-            url = reverse('admin:cash_cashmovement_change', args=[obj.origin_movement.id])
+            url = reverse('admin:cash_movements_change', args=[obj.origin_movement.id])
             return format_html('<a href="{}" target="_blank">Movimiento #{}</a>', url, obj.origin_movement.id)
         return 'No creado'
     origin_movement_link.short_description = 'Movimiento de Salida'
 
     def destination_movement_link(self, obj):
         if obj.destination_movement:
-            url = reverse('admin:cash_cashmovement_change', args=[obj.destination_movement.id])
+            url = reverse('admin:cash_movements_change', args=[obj.destination_movement.id])
             return format_html('<a href="{}" target="_blank">Movimiento #{}</a>', url, obj.destination_movement.id)
         return 'No creado'
     destination_movement_link.short_description = 'Movimiento de Entrada'
