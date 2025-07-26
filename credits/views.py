@@ -3,6 +3,7 @@ from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
+from core.permissions import IsAdmin
 from django.db.models import Sum, Q, Count, Case, When, DecimalField
 from django.utils import timezone
 from datetime import date, timedelta
@@ -65,6 +66,7 @@ class CreditAccountViewSet(viewsets.ModelViewSet):
     
     queryset = CreditAccount.objects.all()
     serializer_class = CreditAccountSerializer
+    permission_classes = [IsAdmin]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = CreditAccountFilter
     search_fields = ['sale__customer__name', 'sale__customer__email', 'sale__customer__phone']
@@ -497,6 +499,7 @@ class CreditPaymentViewSet(viewsets.ModelViewSet):
     
     queryset = CreditPayment.objects.all()
     serializer_class = CreditPaymentSerializer
+    permission_classes = [IsAdmin]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = CreditPaymentFilter
     ordering_fields = ['payment_date', 'amount_paid', 'created_at']
@@ -556,6 +559,7 @@ class CreditPurchaseAccountViewSet(viewsets.ModelViewSet):
 
     queryset = CreditPurchaseAccount.objects.all()
     serializer_class = CreditPurchaseAccountSerializer
+    permission_classes = [IsAdmin]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['purchase_order__supplier']
     search_fields = ['purchase_order__supplier__name']
@@ -905,6 +909,7 @@ class CreditPurchasePaymentViewSet(viewsets.ModelViewSet):
 
     queryset = CreditPurchasePayment.objects.all()
     serializer_class = CreditPurchasePaymentSerializer
+    permission_classes = [IsAdmin]
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_fields = ['credit_account', 'payment_date', 'payment_method']
     ordering_fields = ['payment_date', 'amount_paid', 'created_at']

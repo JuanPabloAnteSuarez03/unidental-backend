@@ -7,6 +7,7 @@ from suppliers.serializers import SupplierSerializer, PurchaseOptionSerializer
 from inventory.models import Location
 from inventory.serializers import LocationSerializer
 from catalogs.models import Product
+from .models import PurchaseOrderPayment
 
 
 class PurchaseOrderItemSerializer(serializers.ModelSerializer):
@@ -105,6 +106,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     destination_details = LocationSerializer(source='destination', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    payment_status = serializers.CharField(read_only=True)
     total_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     total_items = serializers.IntegerField(read_only=True)
     can_be_modified = serializers.BooleanField(read_only=True)
@@ -120,6 +122,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'order_date',
             'status',
             'status_display',
+            'payment_status',
             'created_by',
             'created_by_username',
             'notes',
@@ -150,6 +153,7 @@ class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
     destination_details = LocationSerializer(source='destination', read_only=True)
     created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    payment_status = serializers.CharField(read_only=True)
     items = PurchaseOrderItemSerializer(many=True, read_only=True)
     total_amount = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
     total_items = serializers.IntegerField(read_only=True)
@@ -166,6 +170,7 @@ class PurchaseOrderDetailSerializer(serializers.ModelSerializer):
             'order_date',
             'status',
             'status_display',
+            'payment_status',
             'created_by',
             'created_by_username',
             'notes',
@@ -258,3 +263,29 @@ class ProductAlternativesSerializer(serializers.Serializer):
     product_name = serializers.CharField()
     product_sku = serializers.CharField()
     alternatives = AlternativeBrandSerializer(many=True) 
+
+
+class PurchaseOrderPaymentSerializer(serializers.ModelSerializer):
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    cash_name = serializers.CharField(source='cash.location.name', read_only=True, default=None)
+    is_annulled = serializers.BooleanField(read_only=True)
+    annulled_at = serializers.DateTimeField(read_only=True)
+    annulled_by_username = serializers.CharField(source='annulled_by.username', read_only=True, default=None)
+    order_id = serializers.IntegerField(source='order.id', read_only=True)
+
+    class Meta:
+        model = PurchaseOrderPayment
+        fields = [
+            'id', 'order', 'order_id', 'amount', 'date', 'user', 'user_username',
+            'notes', 'cash', 'cash_name', 'is_annulled', 'annulled_at', 'annulled_by', 'annulled_by_username'
+        ]
+        read_only_fields = ['id', 'date', 'is_annulled', 'annulled_at', 'annulled_by', 'annulled_by_username', 'user_username', 'cash_name', 'order_id']
+
+    def validate(self, data):
+        order = data.get('order') or self.instance.order if self.instance else None
+        amount = data.get('amount')
+        if order and amount and not data.get('is_annulled', False):
+            total_paid = order.get_total_paid(exclude_payment=self.instance) if self.instance else order.get_total_paid()
+            if total_paid + amount > order.get_total_amount():
+                raise serializers.ValidationError({'amount': 'No se puede pagar más del total de la orden.'})
+        return data 
