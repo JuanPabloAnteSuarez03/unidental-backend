@@ -6,7 +6,7 @@ from decimal import Decimal
 from inventory.models import Location
 
 
-class Cash(models.Model):
+class Cashes(models.Model):
     """
     Modelo para representar una caja de efectivo asociada a una ubicación.
     """
@@ -61,7 +61,7 @@ class Cash(models.Model):
         return self.balance >= amount
 
 
-class CashMovement(models.Model):
+class Movements(models.Model):
     """
     Modelo para representar movimientos de efectivo en las cajas.
     """
@@ -85,7 +85,7 @@ class CashMovement(models.Model):
     ]
     
     cash = models.ForeignKey(
-        Cash,
+        Cashes,
         on_delete=models.CASCADE,
         verbose_name="Caja",
         related_name="movements",
@@ -262,7 +262,7 @@ class CashMovement(models.Model):
         self.apply_to_cash_balance(sign=1)
 
 
-class CashTransfer(models.Model):
+class Transfers(models.Model):
     """
     Modelo para representar transferencias entre cajas.
     """
@@ -273,14 +273,14 @@ class CashTransfer(models.Model):
     ]
     
     origin_cash = models.ForeignKey(
-        Cash,
+        Cashes,
         on_delete=models.CASCADE,
         verbose_name="Caja Origen",
         related_name="outgoing_transfers",
         help_text="Caja desde donde sale el dinero"
     )
     destination_cash = models.ForeignKey(
-        Cash,
+        Cashes,
         on_delete=models.CASCADE,
         verbose_name="Caja Destino",
         related_name="incoming_transfers",
@@ -324,7 +324,7 @@ class CashTransfer(models.Model):
     
     # Movimientos generados por la transferencia
     origin_movement = models.ForeignKey(
-        CashMovement,
+        Movements,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -333,7 +333,7 @@ class CashTransfer(models.Model):
         help_text="Movimiento de egreso en la caja origen"
     )
     destination_movement = models.ForeignKey(
-        CashMovement,
+        Movements,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
