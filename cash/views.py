@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from core.permissions import IsAdmin
 from django.db.models import Sum, Q
-from .models import Cash, CashMovement, CashTransfer
+from .models import Cashes, Movements, Transfers
 from .serializers import (
     CashSerializer, CashMovementSerializer, CashMovementCreateSerializer,
     CashTransferSerializer, CashTransferCreateSerializer, CashSummarySerializer
@@ -14,7 +14,7 @@ from .serializers import (
 
 class CashViewSet(viewsets.ModelViewSet):
     """API para gestionar cajas (Cash)."""
-    queryset = Cash.objects.select_related('location').all()
+    queryset = Cashes.objects.select_related('location').all()
     serializer_class = CashSerializer
     permission_classes = [IsAdmin]
     filterset_fields = ['location', 'is_active']
@@ -26,8 +26,8 @@ class CashViewSet(viewsets.ModelViewSet):
     def summary(self, request):
         """Resumen general de todas las cajas."""
         try:
-            total_balance = Cash.get_total_balance()
-            active_cashes_count = Cash.objects.filter(is_active=True).count()
+            total_balance = Cashes.get_total_balance()
+            active_cashes_count = Cashes.objects.filter(is_active=True).count()
             
             # Manejar el filtro de fecha de manera segura
             since_param = request.query_params.get('since')
@@ -36,15 +36,15 @@ class CashViewSet(viewsets.ModelViewSet):
                     from django.utils.dateparse import parse_datetime
                     since_date = parse_datetime(since_param)
                     if since_date:
-                        recent_movements_count = CashMovement.objects.filter(created_at__gte=since_date).count()
+                        recent_movements_count = Movements.objects.filter(created_at__gte=since_date).count()
                     else:
-                        recent_movements_count = CashMovement.objects.count()
+                        recent_movements_count = Movements.objects.count()
                 except (ValueError, TypeError):
-                    recent_movements_count = CashMovement.objects.count()
+                    recent_movements_count = Movements.objects.count()
             else:
-                recent_movements_count = CashMovement.objects.count()
+                recent_movements_count = Movements.objects.count()
             
-            pending_transfers_count = CashTransfer.objects.filter(status='pending').count()
+            pending_transfers_count = Transfers.objects.filter(status='pending').count()
             
             data = {
                 'total_balance': total_balance,
@@ -64,7 +64,7 @@ class CashViewSet(viewsets.ModelViewSet):
 
 class CashMovementViewSet(viewsets.ModelViewSet):
     """API para movimientos de caja."""
-    queryset = CashMovement.objects.select_related('cash', 'created_by', 'sale', 'purchase_order').all()
+    queryset = Movements.objects.select_related('cash', 'created_by', 'sale', 'purchase_order').all()
     permission_classes = [IsAdmin]
     filterset_fields = ['cash', 'movement_type', 'reference_type', 'status', 'created_by']
     search_fields = ['notes', 'cash__location__name', 'created_by__username']
@@ -98,7 +98,7 @@ class CashMovementViewSet(viewsets.ModelViewSet):
 
 class CashTransferViewSet(viewsets.ModelViewSet):
     """API para transferencias de caja entre sedes."""
-    queryset = CashTransfer.objects.select_related('origin_cash', 'destination_cash', 'created_by').all()
+    queryset = Transfers.objects.select_related('origin_cash', 'destination_cash', 'created_by').all()
     permission_classes = [IsAdmin]
     filterset_fields = ['origin_cash', 'destination_cash', 'status', 'created_by']
     search_fields = ['notes', 'origin_cash__location__name', 'destination_cash__location__name', 'created_by__username']

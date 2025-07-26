@@ -8,7 +8,7 @@ from inventory.serializers import LocationSerializer
 from django.db import models
 from django.db import transaction
 from decimal import Decimal
-from cash.models import Cash, CashMovement
+from cash.models import Cashes, Movements
 
 
 class InsufficientStockError(APIException):
@@ -114,8 +114,8 @@ class SaleSerializer(serializers.ModelSerializer):
 
         # --- REGISTRO DE MOVIMIENTO DE CAJA ---
         try:
-            cash = Cash.objects.get(location=sale_location, is_active=True)
-            CashMovement.objects.create(
+            cash = Cashes.objects.get(location=sale_location, is_active=True)
+            Movements.objects.create(
                 cash=cash,
                 movement_type='ingreso',
                 amount=sale.total_net,
@@ -124,7 +124,7 @@ class SaleSerializer(serializers.ModelSerializer):
                 sale=sale,
                 created_by=getattr(self.context.get('request'), 'user', None)
             )
-        except Cash.DoesNotExist:
+        except Cashes.DoesNotExist:
             pass  # Si no hay caja activa para la sede, no se registra movimiento
 
         return sale

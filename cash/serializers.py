@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from decimal import Decimal
-from .models import Cash, CashMovement, CashTransfer
+from .models import Cashes, Movements, Transfers
 from inventory.models import Location
 from sales.models import Sale
 from purchases.models import PurchaseOrder
@@ -17,7 +17,7 @@ class CashSerializer(serializers.ModelSerializer):
     movements_count = serializers.SerializerMethodField()
     
     class Meta:
-        model = Cash
+        model = Cashes
         fields = [
             'id', 'location', 'location_name', 'location_type', 'location_address',
             'balance', 'balance_formatted', 'is_active', 'movements_count',
@@ -39,7 +39,7 @@ class CashSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Solo se pueden crear cajas para sedes, no para bodegas.")
         
         # Verificar si ya existe una caja para esta sede (solo para nuevas cajas)
-        if not self.instance and Cash.objects.filter(location=value).exists():
+        if not self.instance and Cashes.objects.filter(location=value).exists():
             raise serializers.ValidationError(f"Ya existe una caja para la sede '{value.name}'.")
         
         return value
@@ -59,7 +59,7 @@ class CashMovementSerializer(serializers.ModelSerializer):
     purchase_order_info = serializers.SerializerMethodField()
     
     class Meta:
-        model = CashMovement
+        model = Movements
         fields = [
             'id', 'cash', 'cash_name', 'movement_type', 'movement_type_display',
             'amount', 'amount_formatted', 'reference_type', 'reference_type_display',
@@ -111,75 +111,52 @@ class CashMovementSerializer(serializers.ModelSerializer):
         return None
 
     def validate(self, data):
-        """Validaciones personalizadas para el movimiento."""
-        # Validar que el monto sea positivo
-        if data.get('amount', 0) <= 0:
-            raise serializers.ValidationError({
-                'amount': 'El monto debe ser mayor a cero.'
-            })
-
-        # Validar saldo suficiente para egresos (solo para nuevos movimientos)
-        if (data.get('movement_type') == 'egreso' and 
-            data.get('status', 'active') == 'active' and 
-            not self.instance):
-            
-            cash = data.get('cash')
-            amount = data.get('amount', 0)
-            
+        """Validaciones adicionales para movimientos de caja."""
+        cash = data.get('cash')
+        amount = data.get('amount')
+        movement_type = data.get('movement_type')
+        
+        if cash and amount and movement_type == 'egreso':
             if cash and not cash.has_sufficient_balance(amount):
                 raise serializers.ValidationError({
                     'amount': f'Saldo insuficiente en {cash.location.name}. Saldo actual: ${cash.balance:,.2f}'
                 })
-
+        
         return data
 
     def create(self, validated_data):
-        """Crear un nuevo movimiento de caja."""
-        # Agregar el usuario que crea el movimiento
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            validated_data['created_by'] = request.user
-        
-        return super().create(validated_data)
+        """Crea un movimiento y actualiza el saldo de la caja."""
+        movement = super().create(validated_data)
+        movement.apply_to_cash_balance()
+        return movement
 
 
 class CashMovementCreateSerializer(serializers.ModelSerializer):
-    """Serializer simplificado para crear movimientos de caja."""
+    """Serializer para crear movimientos de caja."""
     
     class Meta:
-        model = CashMovement
-        fields = [
-            'cash', 'movement_type', 'amount', 'reference_type', 'notes',
-            'sale', 'purchase_order'
-        ]
+        model = Movements
+        fields = ['cash', 'movement_type', 'amount', 'reference_type', 'notes', 'sale', 'purchase_order']
 
     def validate(self, data):
-        """Validaciones para creación de movimientos."""
-        # Validar que el monto sea positivo
-        if data.get('amount', 0) <= 0:
-            raise serializers.ValidationError({
-                'amount': 'El monto debe ser mayor a cero.'
-            })
-
-        # Validar saldo suficiente para egresos
-        if data.get('movement_type') == 'egreso':
-            cash = data.get('cash')
-            amount = data.get('amount', 0)
-            
+        """Validaciones para crear movimientos."""
+        cash = data.get('cash')
+        amount = data.get('amount')
+        movement_type = data.get('movement_type')
+        
+        if cash and amount and movement_type == 'egreso':
             if cash and not cash.has_sufficient_balance(amount):
                 raise serializers.ValidationError({
                     'amount': f'Saldo insuficiente en {cash.location.name}. Saldo actual: ${cash.balance:,.2f}'
                 })
-
+        
         return data
 
     def create(self, validated_data):
-        """Crear movimiento con usuario."""
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            validated_data['created_by'] = request.user
-        
-        return super().create(validated_data)
+        """Crea un movimiento y actualiza el saldo de la caja."""
+        movement = super().create(validated_data)
+        movement.apply_to_cash_balance()
+        return movement
 
 
 class CashTransferSerializer(serializers.ModelSerializer):
@@ -194,7 +171,7 @@ class CashTransferSerializer(serializers.ModelSerializer):
     destination_movement_info = serializers.SerializerMethodField()
     
     class Meta:
-        model = CashTransfer
+        model = Transfers
         fields = [
             'id', 'origin_cash', 'origin_cash_name', 'destination_cash', 'destination_cash_name',
             'amount', 'amount_formatted', 'notes', 'status', 'status_display',
@@ -202,8 +179,7 @@ class CashTransferSerializer(serializers.ModelSerializer):
             'created_by', 'created_by_name', 'created_at', 'completed_at'
         ]
         read_only_fields = [
-            'id', 'status', 'origin_movement', 'destination_movement',
-            'created_by', 'created_at', 'completed_at'
+            'id', 'origin_movement', 'destination_movement', 'created_at', 'completed_at'
         ]
 
     def get_amount_formatted(self, obj):
@@ -211,22 +187,22 @@ class CashTransferSerializer(serializers.ModelSerializer):
         return f"${obj.amount:,.2f}"
 
     def get_origin_movement_info(self, obj):
-        """Información del movimiento de salida."""
+        """Retorna información del movimiento de salida."""
         if obj.origin_movement:
             return {
                 'id': obj.origin_movement.id,
                 'amount': str(obj.origin_movement.amount),
-                'status': obj.origin_movement.get_status_display()
+                'created_at': obj.origin_movement.created_at
             }
         return None
 
     def get_destination_movement_info(self, obj):
-        """Información del movimiento de entrada."""
+        """Retorna información del movimiento de entrada."""
         if obj.destination_movement:
             return {
                 'id': obj.destination_movement.id,
                 'amount': str(obj.destination_movement.amount),
-                'status': obj.destination_movement.get_status_display()
+                'created_at': obj.destination_movement.created_at
             }
         return None
 
@@ -234,80 +210,55 @@ class CashTransferSerializer(serializers.ModelSerializer):
         """Validaciones para transferencias."""
         origin_cash = data.get('origin_cash')
         destination_cash = data.get('destination_cash')
-        amount = data.get('amount', 0)
-
-        # Validar que no sea la misma caja
-        if origin_cash == destination_cash:
-            raise serializers.ValidationError(
-                "No se puede transferir dinero a la misma caja."
-            )
-
-        # Validar monto positivo
-        if amount <= 0:
-            raise serializers.ValidationError({
-                'amount': 'El monto debe ser mayor a cero.'
-            })
-
-        # Validar saldo suficiente
-        if origin_cash and not origin_cash.has_sufficient_balance(amount):
-            raise serializers.ValidationError({
-                'amount': f'Saldo insuficiente en {origin_cash.location.name}. Saldo actual: ${origin_cash.balance:,.2f}'
-            })
-
+        amount = data.get('amount')
+        
+        if origin_cash and destination_cash:
+            if origin_cash == destination_cash:
+                raise serializers.ValidationError("No se puede transferir a la misma caja.")
+        
+        if origin_cash and amount:
+            if origin_cash and not origin_cash.has_sufficient_balance(amount):
+                raise serializers.ValidationError({
+                    'amount': f'Saldo insuficiente en {origin_cash.location.name}. Saldo actual: ${origin_cash.balance:,.2f}'
+                })
+        
         return data
 
     def create(self, validated_data):
-        """Crear transferencia con usuario."""
-        request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            validated_data['created_by'] = request.user
-        
+        """Crea una transferencia."""
+        validated_data['created_by'] = self.context['request'].user
         return super().create(validated_data)
 
 
 class CashTransferCreateSerializer(serializers.ModelSerializer):
-    """Serializer simplificado para crear transferencias."""
+    """Serializer para crear transferencias."""
     
     class Meta:
-        model = CashTransfer
+        model = Transfers
         fields = ['origin_cash', 'destination_cash', 'amount', 'notes']
 
     def validate(self, data):
-        """Validaciones básicas para transferencias."""
+        """Validaciones para crear transferencias."""
         origin_cash = data.get('origin_cash')
         destination_cash = data.get('destination_cash')
-        amount = data.get('amount', 0)
-
-        if origin_cash == destination_cash:
-            raise serializers.ValidationError(
-                "No se puede transferir dinero a la misma caja."
-            )
-
-        if amount <= 0:
-            raise serializers.ValidationError({
-                'amount': 'El monto debe ser mayor a cero.'
-            })
-
-        if origin_cash and not origin_cash.has_sufficient_balance(amount):
-            raise serializers.ValidationError({
-                'amount': f'Saldo insuficiente en {origin_cash.location.name}. Saldo actual: ${origin_cash.balance:,.2f}'
-            })
-
+        amount = data.get('amount')
+        
+        if origin_cash and destination_cash:
+            if origin_cash == destination_cash:
+                raise serializers.ValidationError("No se puede transferir a la misma caja.")
+        
+        if origin_cash and amount:
+            if origin_cash and not origin_cash.has_sufficient_balance(amount):
+                raise serializers.ValidationError({
+                    'amount': f'Saldo insuficiente en {origin_cash.location.name}. Saldo actual: ${origin_cash.balance:,.2f}'
+                })
+        
         return data
 
     def create(self, validated_data):
-        """Crear y ejecutar transferencia."""
-        request = self.context.get('request')
-        user = request.user if request and hasattr(request, 'user') else None
-        
-        validated_data['created_by'] = user
-        transfer = super().create(validated_data)
-        
-        # Ejecutar la transferencia automáticamente
-        if user:
-            transfer.execute_transfer(user)
-        
-        return transfer
+        """Crea una transferencia."""
+        validated_data['created_by'] = self.context['request'].user
+        return super().create(validated_data)
 
 
 class CashSummarySerializer(serializers.Serializer):
