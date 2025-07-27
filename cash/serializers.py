@@ -125,10 +125,8 @@ class CashMovementSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        """Crea un movimiento y actualiza el saldo de la caja."""
-        movement = super().create(validated_data)
-        movement.apply_to_cash_balance()
-        return movement
+        """Crea un movimiento. El saldo se actualiza automáticamente en el modelo."""
+        return super().create(validated_data)
 
 
 class CashMovementCreateSerializer(serializers.ModelSerializer):
@@ -153,10 +151,8 @@ class CashMovementCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        """Crea un movimiento y actualiza el saldo de la caja."""
-        movement = super().create(validated_data)
-        movement.apply_to_cash_balance()
-        return movement
+        """Crea un movimiento. El saldo se actualiza automáticamente en el modelo."""
+        return super().create(validated_data)
 
 
 class CashTransferSerializer(serializers.ModelSerializer):
