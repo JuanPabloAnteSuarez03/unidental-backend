@@ -207,11 +207,20 @@ class Movements(models.Model):
         previous_status = None
         previous_movement_type = None
         previous_amount = None
+        previous_balance = None
+        
         if not is_new:
-            previous = CashMovement.objects.get(pk=self.pk)
-            previous_status = previous.status
-            previous_movement_type = previous.movement_type
-            previous_amount = previous.amount
+            try:
+                previous = Movements.objects.get(pk=self.pk)
+                previous_status = previous.status
+                previous_movement_type = previous.movement_type
+                previous_amount = previous.amount
+                # Guardar el balance anterior para ajustes
+                if previous.movement_type == 'ajuste':
+                    previous_balance = previous.cash.balance
+            except Movements.DoesNotExist:
+                # Si no existe el registro anterior, es un nuevo registro
+                is_new = True
 
         super().save(*args, **kwargs)
 
@@ -220,11 +229,11 @@ class Movements(models.Model):
             self.apply_to_cash_balance(sign=1)
         elif previous_status != self.status or previous_movement_type != self.movement_type or previous_amount != self.amount:
             # Revertir el anterior
-            self.apply_to_cash_balance(sign=-1, movement_type=previous_movement_type, amount=previous_amount, status=previous_status)
+            self.apply_to_cash_balance(sign=-1, movement_type=previous_movement_type, amount=previous_amount, status=previous_status, previous_balance=previous_balance)
             # Aplicar el nuevo
             self.apply_to_cash_balance(sign=1)
 
-    def apply_to_cash_balance(self, sign=1, movement_type=None, amount=None, status=None):
+    def apply_to_cash_balance(self, sign=1, movement_type=None, amount=None, status=None, previous_balance=None):
         # Usa los valores actuales si no se pasan
         movement_type = movement_type or self.movement_type
         amount = amount if amount is not None else self.amount
@@ -236,7 +245,13 @@ class Movements(models.Model):
         elif movement_type == 'egreso':
             self.cash.balance -= sign * amount
         elif movement_type == 'ajuste':
-            self.cash.balance += sign * amount
+            if sign == 1:  # Aplicando el ajuste
+                self.cash.balance = amount
+            else:  # Revirtiendo el ajuste
+                if previous_balance is not None:
+                    self.cash.balance = previous_balance
+                # Si no tenemos el balance anterior, no podemos revertir el ajuste
+                # En este caso, el ajuste no se revierte automáticamente
         self.cash.save(update_fields=['balance'])
 
     def cancel(self, user, reason=""):
