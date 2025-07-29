@@ -8,7 +8,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cash', '0001_initial'),
         ('purchases', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -24,7 +23,7 @@ class Migration(migrations.Migration):
                 ('is_annulled', models.BooleanField(default=False)),
                 ('annulled_at', models.DateTimeField(blank=True, null=True)),
                 ('annulled_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='annulled_purchase_payments', to=settings.AUTH_USER_MODEL)),
-                ('cash', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='cash.cash')),
+                ('cash', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='cash.cashes')),
                 ('order', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='payments', to='purchases.purchaseorder')),
                 ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),
             ],
