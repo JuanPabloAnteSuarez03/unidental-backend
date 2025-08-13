@@ -392,7 +392,7 @@ class Transfers(models.Model):
             raise ValidationError("Saldo insuficiente en la caja origen.")
         
         # Crear movimiento de egreso en la caja origen
-        self.origin_movement = CashMovement.objects.create(
+        self.origin_movement = Movements.objects.create(
             cash=self.origin_cash,
             movement_type='egreso',
             amount=self.amount,
