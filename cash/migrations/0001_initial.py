@@ -12,7 +12,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('inventory', '0008_inventorymovement_is_conversion'),
-        ('purchases', '0002_purchaseorderpayment'),
         ('sales', '0007_alter_sale_sale_type'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
