@@ -402,7 +402,7 @@ class Transfers(models.Model):
         )
         
         # Crear movimiento de ingreso en la caja destino
-        self.destination_movement = CashMovement.objects.create(
+        self.destination_movement = Movements.objects.create(
             cash=self.destination_cash,
             movement_type='ingreso',
             amount=self.amount,
