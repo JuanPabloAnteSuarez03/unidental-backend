@@ -16,7 +16,7 @@ class CashViewSet(viewsets.ModelViewSet):
     """API para gestionar cajas (Cash)."""
     queryset = Cashes.objects.select_related('location').all()
     serializer_class = CashSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdmin] 
     filterset_fields = ['location', 'is_active']
     search_fields = ['location__name', 'location__address']
     ordering_fields = ['location__name', 'balance', 'created_at']
