@@ -5,6 +5,7 @@ from decimal import Decimal, InvalidOperation
 from datetime import date, timedelta, datetime
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db import connection
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db.models.signals import post_delete
@@ -464,6 +465,17 @@ class Command(BaseCommand):
         """
         self.stdout.write("🗑️  Limpiando base de datos...")
         with transaction.atomic():
+            # No tocar tablas de cash: solo desvincular referencias para evitar errores de FK
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT to_regclass('public.cash_movements');")
+                    reg = cursor.fetchone()
+                    if reg and reg[0]:
+                        self.stdout.write("🔧 Desvinculando referencias de cash_movements a ventas y compras (SET NULL)...")
+                        cursor.execute("UPDATE cash_movements SET sale_id = NULL WHERE sale_id IS NOT NULL;")
+                        cursor.execute("UPDATE cash_movements SET purchase_order_id = NULL WHERE purchase_order_id IS NOT NULL;")
+            except Exception as e:
+                self.stdout.write(f"⚠️  No se pudieron desvincular referencias en 'cash_movements': {e}")
             # Desconectar señales que actualizan inventario y totales
             post_delete.disconnect(update_inventory_on_return_item_delete, sender=ReturnItem)
             post_delete.disconnect(update_return_total, sender=ReturnItem)
