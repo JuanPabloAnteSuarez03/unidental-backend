@@ -17,8 +17,10 @@ class Command(BaseCommand):
             flags_sup.append('--dry-run')
             flags_cli.append('--dry-run')
         else:
+            # No limpiar proveedores para preservar PurchaseOptions creadas previamente
+            # Limpiar base (productos, etc.) y clientes sí
             flags_db.append('--clear-data')
-            flags_sup.append('--clean')
+            # flags_sup: sin '--clean' para no borrar suppliers/purchase options
             flags_cli.append('--clean')
 
         self.stdout.write(self.style.WARNING('LIMPIANDO E IMPORTANDO TODA LA BASE DE DATOS...'))

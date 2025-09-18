@@ -14,6 +14,7 @@ from .serializers import (
     ProductConversionSerializer,
     ConversionExecutionSerializer,
     ConversionSuggestionSerializer,
+    ProductSummarySerializer,
     SkuCategorySerializer,
     SkuSubCategorySerializer,
     SkuTypeSerializer
@@ -254,6 +255,80 @@ class ProductViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """Elimina un producto existente por su ID."""
         return super().destroy(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        method='get',
+        operation_summary="Listar productos por sede (ubicación)",
+        operation_description="Devuelve productos que pertenecen a una sede específica, determinado por registros de inventario asociados a esa ubicación. Incluye paginación.",
+        manual_parameters=[
+            openapi.Parameter('location', openapi.IN_QUERY, description="ID de la ubicación (sede)", type=openapi.TYPE_INTEGER, required=True),
+            openapi.Parameter('has_stock', openapi.IN_QUERY, description="Solo productos con stock > 0 (default: true)", type=openapi.TYPE_BOOLEAN),
+            openapi.Parameter('search', openapi.IN_QUERY, description="Búsqueda por nombre/SKU del producto", type=openapi.TYPE_STRING),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Lista paginada de productos por sede",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'next': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                        'previous': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
+                        'results': openapi.Schema(type=openapi.TYPE_ARRAY, items=ProductSummarySerializer())
+                    }
+                )
+            )
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='by-location')
+    def by_location(self, request):
+        """
+        Lista productos que pertenecen a una sede/ubicación dada.
+        Criterio: existencia de `InventoryStock` asociado a la `location` indicada
+        (si `has_stock=true`, con `quantity__gt=0`).
+        """
+        from inventory.models import InventoryStock, Location
+
+        location_id = request.query_params.get('location')
+        if not location_id:
+            return Response({'error': 'El parámetro location es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validar ubicación
+        try:
+            Location.objects.get(id=location_id)
+        except Location.DoesNotExist:
+            return Response({'error': 'Ubicación no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        has_stock_param = request.query_params.get('has_stock', 'true').lower()
+        has_stock = has_stock_param in ['true', '1', 'yes', 'y']
+
+        # Base queryset
+        queryset = self.get_queryset()
+
+        # Filtrar por relación con InventoryStock y ubicación
+        filter_kwargs = {
+            'stock_locations__location_id': location_id,
+        }
+        if has_stock:
+            filter_kwargs['stock_locations__quantity__gt'] = 0
+
+        # Búsqueda opcional por nombre/SKU
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(sku__icontains=search) | Q(barcode__icontains=search)
+            )
+
+        queryset = queryset.filter(**filter_kwargs).distinct().order_by('name')
+
+        # Paginación estándar DRF
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = ProductSummarySerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = ProductSummarySerializer(queryset, many=True)
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         method='get',
