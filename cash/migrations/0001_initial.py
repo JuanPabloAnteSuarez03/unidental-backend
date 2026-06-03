@@ -11,10 +11,11 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('inventory', '0008_inventorymovement_is_conversion'),
-        ('sales', '0007_alter_sale_sale_type'),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-    ]
+    ('purchases', '0001_initial'),   # ← agregar esta línea
+    ('inventory', '0008_inventorymovement_is_conversion'),
+    ('sales', '0007_alter_sale_sale_type'),
+    migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+]
 
     operations = [
         migrations.CreateModel(
