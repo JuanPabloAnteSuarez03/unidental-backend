@@ -36,6 +36,7 @@ class Sale(models.Model):
         ('normal', 'Efectivo'),
         ('card', 'Tarjeta'),
         ('credit', 'Crédito'),
+        ('transfer', 'Transferencia'),
     ]
 
     customer = models.ForeignKey(
