@@ -274,7 +274,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                         'count': openapi.Schema(type=openapi.TYPE_INTEGER),
                         'next': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
                         'previous': openapi.Schema(type=openapi.TYPE_STRING, nullable=True),
-                        'results': openapi.Schema(type=openapi.TYPE_ARRAY, items=ProductSummarySerializer())
+                        'results': openapi.Schema(type=openapi.TYPE_ARRAY, items=openapi.Schema(type=openapi.TYPE_OBJECT))
                     }
                 )
             )
