@@ -1,195 +1,212 @@
-# UNIDENTAL Backend
+# UNIDENTAL — Backend
 
-Backend de gestión para UNIDENTAL construido con Django 5.2 y Django REST Framework. Cubre catálogo de productos (con SKUs y lotes), inventario por sedes, ventas y devoluciones, compras y proveedores, créditos (CxC y CxP), domicilios, caja (movimientos y transferencias), autenticación y documentación de API.
+**English** · [Español](README.es.md)
 
-## Tabla de contenidos
-- Stack y arquitectura
-- Estructura de apps
-- Puesta en marcha (Quick Start)
-- Variables de entorno
-- Desarrollo local
-- Importación de datos (CSV y comandos)
-- Autenticación
-- Documentación de API (Swagger/Redoc)
-- Paginación, filtros y búsqueda
-- Endpoints destacados por dominio
-- Testing
-- Despliegue (Railway/Render)
+REST API for UNIDENTAL, a dental-supplies distributor operating from two locations in Cali, Colombia. Built with Django 5.2 and Django REST Framework.
+
+Covers the product catalog (SKUs and batches), per-location inventory, sales and returns, purchases and suppliers, receivables and payables, deliveries, and cash handling.
+
+🔗 **Live API docs:** [Swagger](https://unidental-backend.onrender.com/swagger/) · [Redoc](https://unidental-backend.onrender.com/redoc/)
+🔗 **Frontend:** [unidental-frontend](https://github.com/JuanPabloAnteSuarez03/unidental-frontend)
 
 ---
 
-## Stack y arquitectura
-- Django 5.2, Django REST Framework (DRF)
-- Autenticación vía Djoser + Token (rest_framework.authtoken)
-- Documentación interactiva: drf-yasg (Swagger/Redoc)
-- CORS: django-cors-headers
-- Filtros: django-filter
-- Servido de estáticos: WhiteNoise
-- Base de datos: PostgreSQL (prod/dev), SQLite en tests
+## Why this exists
 
-## Estructura de apps
-- `core`: utilidades, health check, email (Djoser), permisos
-- `catalogs`: productos, categorías, sistema SKU (categoría/subcategoría/tipo), lotes (ProductBatch), kits/componentes, conversiones manuales
-- `inventory`: sedes/bodegas (`Location`), stock por sede+lote, movimientos con actualización automática de stock (entradas/salidas/transferencias/conversión compuestos)
-- `sales`: clientes, ventas (items), devoluciones (items), señales que ajustan inventario
-- `suppliers`: proveedores y `PurchaseOption` (marca/precio/validez)
-- `purchases`: órdenes de compra e items
-- `credits`: créditos de ventas (CxC) y compras (CxP), pagos, recordatorios/WhatsApp
-- `deliveries`: entregas/domicilios, estados y estadísticas
-- `cash`: caja por sede, movimientos (ingreso/egreso/ajuste) y transferencias
+The company's inventory wasn't systematized at all: there was no real database, only Google Sheets with no relational structure between products, batches and locations. Any question — how much stock is left, at which location, from which batch — meant cross-checking spreadsheets by hand.
 
-## Puesta en marcha (Quick Start)
+On top of that, these are products with expiry dates. Without a system modelling the relationship between products, batches and locations, which batch to dispatch was left to staff memory, and the cost of a mistake showed up late, as expired product.
+
+**Why Django and DRF instead of Node:** the domain is strongly relational — products, batches, locations, movements and credits reference each other and need transactional integrity.
+
+---
+
+## Stack
+
+| Concern | Technology |
+|---|---|
+| Framework | Django 5.2, Django REST Framework |
+| Auth | Djoser + DRF token authentication |
+| API docs | drf-yasg (Swagger / Redoc) |
+| Filtering | django-filter |
+| CORS | django-cors-headers |
+| Static files | WhiteNoise |
+| Database | PostgreSQL (dev/prod) · SQLite (tests) |
+| Hosting | Render (also configured for Railway) |
+
+---
+
+## Apps
+
+| App | Responsibility |
+|---|---|
+| `core` | Utilities, health check, email (Djoser), permissions |
+| `catalogs` | Products, categories, SKU system (category/subcategory/type), batches (`ProductBatch`), kits and components, manual conversions |
+| `inventory` | Locations and warehouses, stock per location + batch, movements that update stock automatically (inbound, outbound, transfers, composite conversion) |
+| `sales` | Customers, sales and items, returns and items, signals that adjust inventory |
+| `suppliers` | Suppliers and `PurchaseOption` (brand, price, validity) |
+| `purchases` | Purchase orders and items |
+| `credits` | Sales receivables and purchase payables, payments, WhatsApp reminders |
+| `deliveries` | Deliveries, statuses and statistics |
+| `cash` | Per-location cash registers, movements (in/out/adjustment) and transfers |
+
+---
+
+## Quick start
+
 ```bash
-# 1) Crear y activar entorno
+# 1) Create and activate a virtual environment
 python -m venv env
-source env/bin/activate  # Windows: env\Scripts\activate
+source env/bin/activate        # Windows: env\Scripts\activate
 
-# 2) Instalar dependencias
+# 2) Install dependencies
 pip install -r requirements.txt
 
-# 3) Configurar variables de entorno (.env)
-#   SECRET_KEY, DEBUG, DATABASE_URL, etc. (ver sección Variables de entorno)
+# 3) Configure your environment (.env) — see below
 
-# 4) Migraciones
+# 4) Run migrations
 python manage.py migrate
 
-# 5) Ejecutar servidor
+# 5) Start the server
 python manage.py runserver
-
-# 6) Documentación de API
-# Swagger: http://127.0.0.1:8000/swagger/
-# Redoc:   http://127.0.0.1:8000/redoc/
 ```
 
-## Variables de entorno
-Mínimas recomendadas en `.env` (o variables del entorno):
-- `SECRET_KEY`
-- `DEBUG` (True/False)
-- `ALLOWED_HOSTS` (ej: `127.0.0.1,localhost`)
-- `CSRF_TRUSTED_ORIGINS` (ej: `https://mi-dominio.app`)
-- `DATABASE_URL` (PostgreSQL en dev/prod; tests usan SQLite en memoria con `USE_SQLITE_FOR_TESTS=True`)
-- Email (prod): `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, `SERVER_EMAIL`
+Then open http://127.0.0.1:8000/swagger/.
 
+---
 
-## Desarrollo local
-- Autenticación por Token (Djoser). Añadir header: `Authorization: Token <token>`
-- CORS habilitado para dominios de frontend configurados en settings
-- Archivo `unidental/settings.py` contiene configuración para Railway/Render en prod
+## Environment variables
 
-## Importación de datos (CSV y comandos)
-Hay comandos de management para poblar la base desde los CSV incluidos en el repo(base de datos interna del cliente):
+| Variable | Notes |
+|---|---|
+| `SECRET_KEY` | Required |
+| `DEBUG` | `True` / `False` |
+| `ALLOWED_HOSTS` | e.g. `127.0.0.1,localhost` |
+| `CSRF_TRUSTED_ORIGINS` | e.g. `https://my-domain.app` |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `USE_SQLITE_FOR_TESTS` | `True` to run the suite on in-memory SQLite |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`, `SERVER_EMAIL` | Production email |
 
-1) Orquestador todo-en-uno (no borra proveedores para preservar `PurchaseOption` después del flujo):
+---
+
+## Authentication
+
+Djoser endpoints live under `/api/auth/`.
+
+```http
+POST /api/auth/token/login/      → returns a token
+Authorization: Token <token>     → send it on every authenticated request
+```
+
+---
+
+## Importing the client's data
+
+Management commands populate the database from the CSV exports of the client's original spreadsheets, which are checked into the repository.
+
 ```bash
+# All-in-one orchestrator
 python manage.py import_all
 ```
-Internamente ejecuta, en este orden:
-- `populate_database_fast "UNIDENTAL - COMPRAS E INV (1).csv" --clear-data` (productos, SKUs, lotes, stock, opciones de compra, órdenes)
-- `populate_suppliers --file "UNIDENTAL (1) - PROVEEDORES 2024.csv"` (crea/actualiza proveedores, sin `--clean`)
-- `populate_customers --file "UNIDENTAL (1) - BASE DATOS  .csv" --clean` (clientes)
 
-2) Comando rápido y parametrizable (acepta `--clear-data`, `--dry-run`, `--orders-only`):
-```bash
-python manage.py populate_database_fast "UNIDENTAL - COMPRAS E INV (1).csv"
-```
-- Crea `Product`, `ProductBatch` (si la fecha de vencimiento es válida), `InventoryStock` por sede (si columnas de inventario tienen valores), `PurchaseOption`, `PurchaseOrder`/items.
-- `--orders-only`: genera solo órdenes/items a partir de `PurchaseOption` existentes.
+It runs, in order:
 
-3) Proveedores:
-```bash
-python manage.py populate_suppliers --file "UNIDENTAL (1) - PROVEEDORES 2024.csv"
-# Usar --clean solo si quieres eliminar todos los proveedores existentes (ojo: CASCADE sobre PurchaseOption)
-```
+1. `populate_database_fast "UNIDENTAL - COMPRAS E INV (1).csv" --clear-data` — products, SKUs, batches, stock, purchase options and orders
+2. `populate_suppliers --file "UNIDENTAL (1) - PROVEEDORES 2024.csv"` — suppliers (without `--clean`, to preserve `PurchaseOption`)
+3. `populate_customers --file "UNIDENTAL (1) - BASE DATOS  .csv" --clean` — customers
 
-4) Clientes:
-```bash
-python manage.py populate_customers --file "UNIDENTAL (1) - BASE DATOS  .csv" --clean
-```
+Individual commands accept `--clear-data`, `--dry-run` and `--orders-only`.
 
-Notas:
-- El import crea lotes SOLO si la fecha de vencimiento se puede parsear; si no, el producto queda sin control de lotes.
-- `InventoryStock` se crea con los valores de inventario por sede del CSV; si son 0/vacío, no habrá stock asociado (aunque existan lotes).
+> **Notes**
+> - Batches are only created when the expiry date can be parsed; otherwise the product ends up without batch tracking.
+> - `InventoryStock` is created from the per-location inventory columns; if they are `0` or empty, no stock is attached even when batches exist.
+> - Use `populate_suppliers --clean` with care — it cascades onto `PurchaseOption`.
 
-## Autenticación
-Endpoints Djoser disponibles en `/api/auth/`.
-- Obtener token: `POST /api/auth/token/login/` (Djoser + authtoken)
-- Incluir el token en `Authorization: Token <token>` para todas las llamadas autenticadas.
+---
 
-## Documentación de API
-- Swagger UI: `/swagger/`
-- Redoc: `/redoc/`
-- Esquema JSON/YAML: `/swagger.json` o `/swagger.yaml`
+## API reference
 
-## Paginación, filtros y búsqueda
-- Paginación por defecto DRF (PageNumberPagination), `PAGE_SIZE=25`
-- Filtros: `django-filter` (ver parámetros en Swagger)
-- Búsqueda (cuando aplica): `search=texto`
+Interactive documentation: `/swagger/`, `/redoc/`, raw schema at `/swagger.json` or `/swagger.yaml`.
 
-## Endpoints destacados por dominio
+Pagination is DRF's `PageNumberPagination` with `PAGE_SIZE=25`; filtering via `django-filter`; text search through `?search=`.
 
-### Catálogo (`/api/catalogs/`)
-- Productos CRUD: `/products/`
-- Productos (todos, sin paginar): `/products/all/`
-- NUEVO: Productos por sede (paginado):
-  - `GET /products/by-location/?location=<id>&has_stock=true|false&search=...`
-  - Devuelve productos con registros de inventario en esa `location` (si `has_stock=true`, con `quantity>0`).
-- Componentes de kits: `/product-components/`
-- Lotes: `/product-batches/`
-- Conversiones manuales: `/product-conversions/`, ejecutar `/conversions/execute/`, sugerir `/conversions/suggest/`
-- Sistema SKU: `/sku-categories/`, `/sku-subcategories/`, `/sku-types/`, info `/sku/info/`, generar `/sku/generate/`, validar `/sku/validate/`
+<details>
+<summary><strong>Notable endpoints by domain</strong></summary>
 
-### Inventario (`/api/inventory/`)
-- Sedes: `/locations/`
-- Stock (CRUD y listados): `/stock/`, resumen `/stock/summary/`, completo `/stock/all/`
-- Stock por lotes (FIFO): `/stock/by_batches/`
-- Lotes de un producto con stock por sedes: `/stock/product_batches_stock/?product=...`
-- Lotes en una sede: `/stock/location_batch_stock/?location=...`
-- Movimientos (actualización automática de stock): `/movements/` (+ `complete`/`cancel`), alertas de stock y vencimientos
+**Catalog** — `/api/catalogs/`
+- Products: `/products/`, unpaginated `/products/all/`
+- Products by location: `GET /products/by-location/?location=<id>&has_stock=true|false&search=...`
+- Kit components: `/product-components/` · Batches: `/product-batches/`
+- Manual conversions: `/product-conversions/`, `/conversions/execute/`, `/conversions/suggest/`
+- SKU system: `/sku-categories/`, `/sku-subcategories/`, `/sku-types/`, `/sku/info/`, `/sku/generate/`, `/sku/validate/`
 
-### Ventas (`/api/sales/`)
-- Clientes: `/customers/`
-- Ventas y items: `/sales/`, `/sale-items/`
-- Devoluciones e items: `/returns/`, `/return-items/`
-- Estadísticas por período y por sede
+**Inventory** — `/api/inventory/`
+- Locations: `/locations/`
+- Stock: `/stock/`, `/stock/summary/`, `/stock/all/`
+- FIFO batch stock: `/stock/by_batches/`
+- Batches of a product across locations: `/stock/product_batches_stock/?product=...`
+- Batches at one location: `/stock/location_batch_stock/?location=...`
+- Movements: `/movements/` (+ `complete`, `cancel`), stock-level and expiry alerts
 
-### Compras y Proveedores
-- Proveedores: `/api/suppliers/suppliers/`
-- Opciones de compra: `/api/suppliers/purchase-options/`
-- Órdenes de compra e items: `/api/purchases/orders/`, `/api/purchases/items/`
+**Sales** — `/api/sales/`
+- Customers `/customers/` · Sales `/sales/`, `/sale-items/` · Returns `/returns/`, `/return-items/`
+- Statistics by period and location
 
-### Créditos (`/api/credits/`)
-- Cuentas (ventas) y pagos: `/accounts/`, `/payments/`
-- Cuentas (compras) y pagos: `/purchase-accounts/`, `/purchase-payments/`
-- Estadísticas, resúmenes y URLs de WhatsApp para recordatorios
+**Purchases & suppliers**
+- `/api/suppliers/suppliers/` · `/api/suppliers/purchase-options/`
+- `/api/purchases/orders/` · `/api/purchases/items/`
 
-### Entregas (`/api/deliveries/`)
-- Entregas CRUD y acciones (`update_status`, `mark_shipped`, `mark_delivered`)
-- Estadísticas y resúmenes por ubicación
+**Credits** — `/api/credits/`
+- Receivables `/accounts/`, `/payments/` · Payables `/purchase-accounts/`, `/purchase-payments/`
+- Statistics, summaries and WhatsApp reminder URLs
 
-### Caja (`/api/cash/`)
-- Cajas por sede: `/cashes/` (+ `summary`)
-- Movimientos: `/movements/` (+ `cancel`/`reactivate`)
-- Transferencias: `/transfers/` (+ `execute`/`cancel`)
+**Deliveries** — `/api/deliveries/`
+- CRUD plus `update_status`, `mark_shipped`, `mark_delivered`; statistics per location
 
-### Core
-- Health check: `/api/core/health-check/` (verifica DB y caché)
+**Cash** — `/api/cash/`
+- Registers `/cashes/` (+ `summary`) · Movements `/movements/` (+ `cancel`, `reactivate`) · Transfers `/transfers/` (+ `execute`, `cancel`)
+
+**Core**
+- Health check: `/api/core/health-check/` — verifies database and cache
+
+</details>
+
+---
 
 ## Testing
+
 ```bash
 pytest -q
 ```
-- En CI/tests, se usa SQLite en memoria (`USE_SQLITE_FOR_TESTS=True`)
-- Suite de pruebas por app (ver carpeta `tests/` en cada app)
 
-## Despliegue (Railway/Render)
-- Configurar variables (`SECRET_KEY`, `DEBUG=False`, `DATABASE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, email/Twilio si aplica)
-- `collectstatic` manejado por WhiteNoise
-- Revisar `RAILWAY_PERFORMANCE_TROUBLESHOOTING.md` para optimizaciones
+Tests run against in-memory SQLite (`USE_SQLITE_FOR_TESTS=True`). Each app carries its own `tests/` folder.
 
 ---
 
-## Notas de negocio
-- Modelo de productos “independientes” con conversiones manuales (no hay desarmados automáticos en ventas).
-- Documentación funcional ampliada en `docs/` (tests de lotes, jerarquías, conversión manual, guía frontend).
+## Deployment
 
-Si necesitas ejemplos de request/response específicos por endpoint, consulta Swagger o los tests de cada app.
+Deployed on Render (`render.yaml`; `railway.json` is also present for Railway).
+
+- Set `SECRET_KEY`, `DEBUG=False`, `DATABASE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS` and the email variables
+- `collectstatic` is handled by WhiteNoise
+- See `RAILWAY_PERFORMANCE_TROUBLESHOOTING.md` for performance notes
+
+---
+
+## Business notes
+
+- Products are modelled as **independent items with manual conversions** — there is no automatic breakdown of kits during a sale.
+- Batch selection defaults to **FIFO** (closest to expiry first), with a **manual override**: the counter needs to break that rule when a customer asks for a specific batch. Automating with no escape hatch would have pushed staff to work around the system.
+- Extended functional documentation lives in `docs/`.
+
+---
+
+## About
+
+Built by [Juan Pablo Ante Suárez](https://github.com/JuanPabloAnteSuarez03). I developed the entire backend; the React frontend was implemented largely together with a teammate, on top of this API.
+
+📖 **Full case study:** [juanpabloante.vercel.app/en/projects/unidental](https://juanpabloante.vercel.app/en/projects/unidental)
+
+---
+
+Private · © UNIDENTAL. All rights reserved.
